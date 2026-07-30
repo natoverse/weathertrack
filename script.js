@@ -7,10 +7,12 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 const controls = {
+  name: document.querySelector("#trip-name"),
   newTrip: document.querySelector("#new-trip"),
   undo: document.querySelector("#undo-point"),
   finish: document.querySelector("#finish-track"),
   addWaypoint: document.querySelector("#add-waypoint"),
+  save: document.querySelector("#save-trip"),
   clear: document.querySelector("#clear-trip"),
   snap: document.querySelector("#snap-to-routes"),
   status: document.querySelector("#trip-status"),
@@ -50,6 +52,7 @@ function updateControls() {
     : "Add stop";
   controls.clear.disabled =
     !hasTrack && state.waypoints.length === 0 && !state.routing;
+  controls.save.disabled = state.anchors.length < 2 || state.routing;
   controls.newTrip.disabled = state.routing;
   controls.snap.disabled = state.routing;
 }
@@ -78,6 +81,7 @@ function clearTrip() {
   state.routing = false;
   state.waypoints.forEach(({ marker }) => marker.remove());
   state.waypoints = [];
+  controls.name.value = "";
   controls.waypointList.replaceChildren();
   renderTrack();
   updateControls();
@@ -250,9 +254,8 @@ function closestPointOnTrack(point) {
   return closest;
 }
 
-function addWaypoint(point) {
+function renderWaypoint(location) {
   const stopNumber = state.waypoints.length + 1;
-  const location = closestPointOnTrack(point);
   const marker = L.marker(location)
     .bindTooltip(`Stop ${stopNumber}`, {
       permanent: true,
@@ -263,9 +266,85 @@ function addWaypoint(point) {
   item.textContent = `Stop ${stopNumber}`;
   controls.waypointList.append(item);
   state.waypoints.push({ marker, item });
+}
+
+function addWaypoint(point) {
+  const stopNumber = state.waypoints.length + 1;
+  renderWaypoint(closestPointOnTrack(point));
   state.placingWaypoint = false;
   setStatus(`Stop ${stopNumber} added. Add another stop or start a new trip.`);
   updateControls();
+}
+
+function coordinates(point) {
+  return [
+    Number(point.lat.toFixed(6)),
+    Number(point.lng.toFixed(6)),
+  ];
+}
+
+function saveTrip() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("name", controls.name.value.trim());
+  url.searchParams.set(
+    "track",
+    JSON.stringify(trackPoints().map(coordinates)),
+  );
+  url.searchParams.set(
+    "stops",
+    JSON.stringify(
+      state.waypoints.map(({ marker }) => coordinates(marker.getLatLng())),
+    ),
+  );
+  window.history.replaceState(null, "", url);
+  setStatus("Trip saved in the URL. Copy it to share this trip.");
+}
+
+function validCoordinates(value) {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    value.every(Number.isFinite) &&
+    value[0] >= -90 &&
+    value[0] <= 90 &&
+    value[1] >= -180 &&
+    value[1] <= 180
+  );
+}
+
+function loadTrip() {
+  const parameters = new URLSearchParams(window.location.search);
+  if (!parameters.has("track")) {
+    return;
+  }
+
+  try {
+    const savedTrack = JSON.parse(parameters.get("track"));
+    const savedStops = JSON.parse(parameters.get("stops") || "[]");
+    if (
+      !Array.isArray(savedTrack) ||
+      savedTrack.length < 2 ||
+      savedTrack.length > 50000 ||
+      !savedTrack.every(validCoordinates) ||
+      !Array.isArray(savedStops) ||
+      savedStops.length > 1000 ||
+      !savedStops.every(validCoordinates)
+    ) {
+      throw new Error("Invalid trip");
+    }
+
+    controls.name.value = (parameters.get("name") || "").slice(0, 100);
+    state.anchors = savedTrack.map(([lat, lng]) => L.latLng(lat, lng));
+    state.segments = state.anchors
+      .slice(1)
+      .map((point, index) => [state.anchors[index], point]);
+    savedStops.forEach(([lat, lng]) => renderWaypoint(L.latLng(lat, lng)));
+    renderTrack();
+    setStatus("Shared trip loaded.");
+    map.fitBounds(track.getBounds(), { padding: [30, 30] });
+  } catch {
+    setStatus("This shared trip URL could not be loaded.");
+  }
 }
 
 controls.newTrip.addEventListener("click", () => {
@@ -312,6 +391,8 @@ controls.clear.addEventListener("click", () => {
   setStatus("Trip cleared. Select “New trip” to begin.");
 });
 
+controls.save.addEventListener("click", saveTrip);
+
 map.on("click", ({ latlng }) => {
   if (state.recording) {
     addTrackPoint(latlng);
@@ -320,4 +401,5 @@ map.on("click", ({ latlng }) => {
   }
 });
 
+loadTrip();
 updateControls();

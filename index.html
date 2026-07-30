@@ -24,6 +24,10 @@
         <p class="instructions">
           Start a trip, then click the map to plot its track.
         </p>
+        <label class="trip-name">
+          Trip name
+          <input id="trip-name" type="text" maxlength="100" />
+        </label>
         <div class="tool-buttons">
           <button id="new-trip" type="button">New trip</button>
           <button id="undo-point" type="button" disabled>Undo</button>
@@ -31,6 +35,7 @@
             Finish track
           </button>
           <button id="add-waypoint" type="button" disabled>Add stop</button>
+          <button id="save-trip" type="button" disabled>Save</button>
           <button id="clear-trip" type="button" disabled>Clear</button>
         </div>
         <label class="snap-option">
