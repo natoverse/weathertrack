@@ -17,7 +17,33 @@
     <header>
       <h1>WeatherTrack</h1>
     </header>
-    <main id="map" aria-label="Interactive trip planning map"></main>
+    <div class="app-shell">
+      <main id="map" aria-label="Interactive trip planning map"></main>
+      <section class="trip-tools" aria-labelledby="trip-tools-title">
+        <h2 id="trip-tools-title">Plan a trip</h2>
+        <p class="instructions">
+          Start a trip, then click the map to plot its track.
+        </p>
+        <div class="tool-buttons">
+          <button id="new-trip" type="button">New trip</button>
+          <button id="undo-point" type="button" disabled>Undo</button>
+          <button id="finish-track" type="button" disabled>
+            Finish track
+          </button>
+          <button id="add-waypoint" type="button" disabled>Add stop</button>
+          <button id="clear-trip" type="button" disabled>Clear</button>
+        </div>
+        <label class="snap-option">
+          <input id="snap-to-routes" type="checkbox" checked />
+          Snap to trails and roads when available
+        </label>
+        <output id="trip-status" aria-live="polite">
+          Select “New trip” to begin.
+        </output>
+        <ol id="waypoint-list" aria-label="Trip stops"></ol>
+        <small>Routing data © OpenStreetMap contributors</small>
+      </section>
+    </div>
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
