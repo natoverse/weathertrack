@@ -28,6 +28,10 @@
           Trip name
           <input id="trip-name" type="text" maxlength="100" />
         </label>
+        <label class="trip-date">
+          Trip start date
+          <input id="trip-date" type="date" />
+        </label>
         <div class="tool-buttons">
           <button id="new-trip" type="button">New trip</button>
           <button id="undo-point" type="button" disabled>Undo</button>
@@ -46,6 +50,20 @@
           Select “New trip” to begin.
         </output>
         <ol id="waypoint-list" aria-label="Trip stops"></ol>
+        <section class="forecast-panel" aria-labelledby="forecast-title">
+          <div class="forecast-heading">
+            <h2 id="forecast-title">NWS forecast</h2>
+            <button id="update-forecast" type="button" disabled>Update</button>
+          </div>
+          <p class="forecast-help">
+            Stop 1 uses the trip start date; each following stop is one day
+            later.
+          </p>
+          <output id="forecast-status" aria-live="polite">
+            Add a stop to load its NWS forecast.
+          </output>
+          <div id="forecast-results"></div>
+        </section>
         <small>Routing data © OpenStreetMap contributors</small>
       </section>
     </div>

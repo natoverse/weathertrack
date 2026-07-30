@@ -8,6 +8,7 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const controls = {
   name: document.querySelector("#trip-name"),
+  date: document.querySelector("#trip-date"),
   newTrip: document.querySelector("#new-trip"),
   undo: document.querySelector("#undo-point"),
   finish: document.querySelector("#finish-track"),
@@ -17,6 +18,9 @@ const controls = {
   snap: document.querySelector("#snap-to-routes"),
   status: document.querySelector("#trip-status"),
   waypointList: document.querySelector("#waypoint-list"),
+  updateForecast: document.querySelector("#update-forecast"),
+  forecastStatus: document.querySelector("#forecast-status"),
+  forecastResults: document.querySelector("#forecast-results"),
 };
 
 const track = L.polyline([], {
@@ -33,7 +37,18 @@ const state = {
   placingWaypoint: false,
   routing: false,
   routeRequest: 0,
+  forecasting: false,
+  forecastRequest: 0,
+  forecastController: null,
 };
+
+function localDate() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+controls.date.value = localDate();
 
 function setStatus(message) {
   controls.status.value = message;
@@ -55,6 +70,11 @@ function updateControls() {
   controls.save.disabled = state.anchors.length < 2 || state.routing;
   controls.newTrip.disabled = state.routing;
   controls.snap.disabled = state.routing;
+  controls.updateForecast.disabled =
+    state.waypoints.length === 0 ||
+    !validDate(controls.date.value) ||
+    state.routing ||
+    state.forecasting;
 }
 
 function trackPoints() {
@@ -81,7 +101,9 @@ function clearTrip() {
   state.routing = false;
   state.waypoints.forEach(({ marker }) => marker.remove());
   state.waypoints = [];
+  clearForecasts();
   controls.name.value = "";
+  controls.date.value = localDate();
   controls.waypointList.replaceChildren();
   renderTrack();
   updateControls();
@@ -266,6 +288,7 @@ function renderWaypoint(location) {
   item.textContent = `Stop ${stopNumber}`;
   controls.waypointList.append(item);
   state.waypoints.push({ marker, item });
+  clearForecasts();
 }
 
 function addWaypoint(point) {
@@ -283,6 +306,38 @@ function coordinates(point) {
   ];
 }
 
+function validDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(date.valueOf()) &&
+    date.toISOString().slice(0, 10) === value
+  );
+}
+
+function stopDate(index) {
+  const date = new Date(`${controls.date.value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + index);
+  return date.toISOString().slice(0, 10);
+}
+
+function clearForecasts() {
+  state.forecastRequest += 1;
+  state.forecasting = false;
+  state.forecastController?.abort();
+  state.forecastController = null;
+  controls.forecastResults.replaceChildren();
+  const message =
+    state.waypoints.length === 0
+      ? "Add a stop to load its NWS forecast."
+      : "Select Update to load the NWS forecast.";
+  controls.forecastStatus.value = message;
+  controls.forecastStatus.textContent = message;
+}
+
 function saveTrip() {
   const url = new URL(window.location.href);
   url.searchParams.set("name", controls.name.value.trim());
@@ -296,6 +351,11 @@ function saveTrip() {
       state.waypoints.map(({ marker }) => coordinates(marker.getLatLng())),
     ),
   );
+  if (validDate(controls.date.value)) {
+    url.searchParams.set("start", controls.date.value);
+  } else {
+    url.searchParams.delete("start");
+  }
   window.history.replaceState(null, "", url);
   setStatus("Trip saved in the URL. Copy it to share this trip.");
 }
@@ -334,6 +394,9 @@ function loadTrip() {
     }
 
     controls.name.value = (parameters.get("name") || "").slice(0, 100);
+    if (validDate(parameters.get("start") || "")) {
+      controls.date.value = parameters.get("start");
+    }
     state.anchors = savedTrack.map(([lat, lng]) => L.latLng(lat, lng));
     state.segments = state.anchors
       .slice(1)
@@ -345,6 +408,150 @@ function loadTrip() {
   } catch {
     setStatus("This shared trip URL could not be loaded.");
   }
+}
+
+async function fetchNws(url, signal) {
+  const response = await fetch(url, {
+    headers: { Accept: "application/geo+json" },
+    referrerPolicy: "no-referrer",
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error("NWS data is unavailable");
+  }
+  return response.json();
+}
+
+function nwsUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== "https:" || url.hostname !== "api.weather.gov") {
+    throw new Error("NWS returned an invalid forecast address");
+  }
+  return url;
+}
+
+async function loadStopForecast(waypoint, index, signal) {
+  const location = waypoint.marker.getLatLng();
+  const pointUrl = new URL(
+    `https://api.weather.gov/points/${location.lat.toFixed(4)},${location.lng.toFixed(4)}`,
+  );
+  const pointData = await fetchNws(pointUrl, signal);
+  const forecastUrl = nwsUrl(pointData?.properties?.forecast);
+  const forecast = await fetchNws(forecastUrl, signal);
+  const date = stopDate(index);
+  const periods = forecast?.properties?.periods;
+
+  if (!Array.isArray(periods)) {
+    throw new Error("NWS returned an invalid forecast");
+  }
+
+  return {
+    date,
+    place: [
+      pointData?.properties?.relativeLocation?.properties?.city,
+      pointData?.properties?.relativeLocation?.properties?.state,
+    ]
+      .filter((part) => typeof part === "string" && part)
+      .join(", "),
+    periods: periods.filter(
+      (period) =>
+        typeof period?.startTime === "string" &&
+        period.startTime.slice(0, 10) === date,
+    ),
+  };
+}
+
+function addText(parent, elementName, text, className) {
+  const element = document.createElement(elementName);
+  element.textContent = String(text).slice(0, 2000);
+  if (className) {
+    element.className = className;
+  }
+  parent.append(element);
+  return element;
+}
+
+function renderForecast(result, index) {
+  const card = document.createElement("article");
+  card.className = "forecast-card";
+  addText(card, "h3", `Stop ${index + 1} — ${result.date}`);
+
+  if (result.place) {
+    addText(card, "p", result.place);
+  }
+
+  if (result.error) {
+    addText(card, "p", result.error, "forecast-detail");
+  } else if (result.periods.length === 0) {
+    addText(
+      card,
+      "p",
+      "No NWS forecast is available for this date.",
+      "forecast-detail",
+    );
+  } else {
+    const list = document.createElement("ul");
+    result.periods.forEach((period) => {
+      const item = document.createElement("li");
+      const temperature =
+        Number.isFinite(period.temperature) &&
+        ["F", "C"].includes(period.temperatureUnit)
+          ? `, ${period.temperature}°${period.temperatureUnit}`
+          : "";
+      addText(
+        item,
+        "strong",
+        `${period.name || "Forecast"}${temperature}: ${period.shortForecast || ""}`,
+      );
+      if (period.detailedForecast) {
+        addText(item, "div", period.detailedForecast, "forecast-detail");
+      }
+      list.append(item);
+    });
+    card.append(list);
+  }
+
+  controls.forecastResults.append(card);
+}
+
+async function updateForecasts() {
+  const request = state.forecastRequest + 1;
+  state.forecastRequest = request;
+  state.forecasting = true;
+  state.forecastController?.abort();
+  const controller = new AbortController();
+  state.forecastController = controller;
+  controls.forecastResults.replaceChildren();
+  controls.forecastStatus.value = "Loading NWS forecasts…";
+  controls.forecastStatus.textContent = "Loading NWS forecasts…";
+  updateControls();
+
+  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  const results = await Promise.all(
+    state.waypoints.map((waypoint, index) =>
+      loadStopForecast(waypoint, index, controller.signal).catch((error) => ({
+        date: stopDate(index),
+        error:
+          error.name === "AbortError"
+            ? "The NWS request timed out."
+            : "The NWS forecast could not be loaded for this stop.",
+        periods: [],
+      })),
+    ),
+  );
+  window.clearTimeout(timeout);
+
+  if (request !== state.forecastRequest) {
+    return;
+  }
+
+  state.forecasting = false;
+  state.forecastController = null;
+  results.forEach(renderForecast);
+  const updated = new Date();
+  controls.forecastStatus.value = `Updated ${updated.toLocaleString()}.`;
+  controls.forecastStatus.textContent = `Updated ${updated.toLocaleString()}.`;
+  updateControls();
 }
 
 controls.newTrip.addEventListener("click", () => {
@@ -392,6 +599,11 @@ controls.clear.addEventListener("click", () => {
 });
 
 controls.save.addEventListener("click", saveTrip);
+controls.updateForecast.addEventListener("click", updateForecasts);
+controls.date.addEventListener("change", () => {
+  clearForecasts();
+  updateControls();
+});
 
 map.on("click", ({ latlng }) => {
   if (state.recording) {

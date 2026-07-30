@@ -66,13 +66,15 @@ h1 {
   font-size: 0.9rem;
 }
 
-.trip-name {
+.trip-name,
+.trip-date {
   display: block;
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
 }
 
-.trip-name input {
+.trip-name input,
+.trip-date input {
   display: block;
   width: 100%;
   margin-top: 0.25rem;
@@ -144,6 +146,67 @@ button:disabled {
 
 #waypoint-list:empty {
   display: none;
+}
+
+.forecast-panel {
+  padding-top: 0.75rem;
+  margin: 0.75rem 0;
+  border-top: 1px solid #c8d2cc;
+}
+
+.forecast-heading {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.forecast-heading h2 {
+  margin: 0;
+}
+
+.forecast-help {
+  margin: 0.5rem 0;
+  color: #3f4a45;
+  font-size: 0.8rem;
+}
+
+#forecast-status {
+  display: block;
+  color: #3f4a45;
+  font-size: 0.875rem;
+}
+
+.forecast-card {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #d7ddd9;
+}
+
+.forecast-card:last-child {
+  border-bottom: 0;
+}
+
+.forecast-card h3,
+.forecast-card p {
+  margin: 0 0 0.35rem;
+}
+
+.forecast-card h3 {
+  font-size: 1rem;
+}
+
+.forecast-card ul {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 0;
+}
+
+.forecast-card li + li {
+  margin-top: 0.5rem;
+}
+
+.forecast-detail {
+  color: #3f4a45;
+  font-size: 0.8rem;
 }
 
 .trip-tools small {
