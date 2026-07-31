@@ -40,6 +40,7 @@ const state = {
   forecasting: false,
   forecastRequest: 0,
   forecastController: null,
+  saving: false,
 };
 
 function localDate() {
@@ -67,7 +68,8 @@ function updateControls() {
     : "Add stop";
   controls.clear.disabled =
     !hasTrack && state.waypoints.length === 0 && !state.routing;
-  controls.save.disabled = state.anchors.length < 2 || state.routing;
+  controls.save.disabled =
+    state.anchors.length < 2 || state.routing || state.saving;
   controls.newTrip.disabled = state.routing;
   controls.snap.disabled = state.routing;
   controls.updateForecast.disabled =
@@ -338,26 +340,156 @@ function clearForecasts() {
   controls.forecastStatus.textContent = message;
 }
 
-function saveTrip() {
-  const url = new URL(window.location.href);
-  url.searchParams.set("name", controls.name.value.trim());
-  url.searchParams.set(
-    "track",
-    JSON.stringify(trackPoints().map(coordinates)),
-  );
-  url.searchParams.set(
-    "stops",
-    JSON.stringify(
-      state.waypoints.map(({ marker }) => coordinates(marker.getLatLng())),
+function tripData() {
+  const trip = {
+    name: controls.name.value.trim(),
+    track: trackPoints().map(coordinates),
+    stops: state.waypoints.map(({ marker }) =>
+      coordinates(marker.getLatLng()),
     ),
-  );
+  };
   if (validDate(controls.date.value)) {
-    url.searchParams.set("start", controls.date.value);
-  } else {
-    url.searchParams.delete("start");
+    trip.start = controls.date.value;
   }
-  window.history.replaceState(null, "", url);
-  setStatus("Trip saved in the URL. Copy it to share this trip.");
+  return trip;
+}
+
+function tripStorageUrl(token) {
+  const configuredUrl = window.WEATHERTRACK_DATABASE_URL;
+  if (typeof configuredUrl !== "string" || configuredUrl.length === 0) {
+    throw new Error("Trip storage is not configured");
+  }
+
+  const url = new URL(configuredUrl);
+  if (
+    url.protocol !== "https:" ||
+    (!url.hostname.endsWith(".firebaseio.com") &&
+      !url.hostname.endsWith(".firebasedatabase.app"))
+  ) {
+    throw new Error("Trip storage URL is invalid");
+  }
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/trips/${token}.json`;
+  url.search = "";
+  url.hash = "";
+  return url;
+}
+
+function tripToken() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function saveTrip() {
+  const token = tripToken();
+  let storageUrl;
+  try {
+    storageUrl = tripStorageUrl(token);
+  } catch {
+    setStatus("Cloud trip storage is not configured.");
+    return;
+  }
+
+  state.saving = true;
+  setStatus("Saving trip…");
+  updateControls();
+
+  try {
+    const response = await fetch(storageUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(tripData()),
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) {
+      throw new Error("Trip storage is unavailable");
+    }
+
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("trip", token);
+    window.history.replaceState(null, "", url);
+    setStatus("Trip saved. Copy this page’s URL to share it.");
+  } catch {
+    setStatus("The trip could not be saved. Please try again.");
+  } finally {
+    state.saving = false;
+    updateControls();
+  }
+}
+
+function loadSavedTrip(trip) {
+  const stops = trip?.stops ?? [];
+  if (
+    typeof trip?.name !== "string" ||
+    trip.name.length > 100 ||
+    !Array.isArray(trip.track) ||
+    trip.track.length < 2 ||
+    trip.track.length > 50000 ||
+    !trip.track.every(validCoordinates) ||
+    !Array.isArray(stops) ||
+    stops.length > 1000 ||
+    !stops.every(validCoordinates) ||
+    (trip.start !== undefined && !validDate(trip.start))
+  ) {
+    throw new Error("Invalid trip");
+  }
+
+  controls.name.value = trip.name;
+  if (trip.start !== undefined) {
+    controls.date.value = trip.start;
+  }
+  state.anchors = trip.track.map(([lat, lng]) => L.latLng(lat, lng));
+  state.segments = state.anchors
+    .slice(1)
+    .map((point, index) => [state.anchors[index], point]);
+  stops.forEach(([lat, lng]) => renderWaypoint(L.latLng(lat, lng)));
+  renderTrack();
+  setStatus("Shared trip loaded.");
+  map.fitBounds(track.getBounds(), { padding: [30, 30] });
+  updateControls();
+}
+
+function loadLegacyTrip(parameters) {
+  const trip = {
+    name: (parameters.get("name") || "").slice(0, 100),
+    track: JSON.parse(parameters.get("track")),
+    stops: JSON.parse(parameters.get("stops") || "[]"),
+  };
+  if (parameters.has("start")) {
+    trip.start = parameters.get("start");
+  }
+  loadSavedTrip(trip);
+}
+
+async function loadTrip() {
+  const parameters = new URLSearchParams(window.location.search);
+  const token = parameters.get("trip");
+  if (!token && !parameters.has("track")) {
+    return;
+  }
+
+  try {
+    if (!token) {
+      loadLegacyTrip(parameters);
+      return;
+    }
+    if (!/^[a-f0-9]{32}$/.test(token)) {
+      throw new Error("Invalid trip");
+    }
+
+    setStatus("Loading shared trip…");
+    const response = await fetch(tripStorageUrl(token), {
+      headers: { Accept: "application/json" },
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) {
+      throw new Error("Trip storage is unavailable");
+    }
+    loadSavedTrip(await response.json());
+  } catch {
+    setStatus("This shared trip URL could not be loaded.");
+  }
 }
 
 function validCoordinates(value) {
@@ -370,44 +502,6 @@ function validCoordinates(value) {
     value[1] >= -180 &&
     value[1] <= 180
   );
-}
-
-function loadTrip() {
-  const parameters = new URLSearchParams(window.location.search);
-  if (!parameters.has("track")) {
-    return;
-  }
-
-  try {
-    const savedTrack = JSON.parse(parameters.get("track"));
-    const savedStops = JSON.parse(parameters.get("stops") || "[]");
-    if (
-      !Array.isArray(savedTrack) ||
-      savedTrack.length < 2 ||
-      savedTrack.length > 50000 ||
-      !savedTrack.every(validCoordinates) ||
-      !Array.isArray(savedStops) ||
-      savedStops.length > 1000 ||
-      !savedStops.every(validCoordinates)
-    ) {
-      throw new Error("Invalid trip");
-    }
-
-    controls.name.value = (parameters.get("name") || "").slice(0, 100);
-    if (validDate(parameters.get("start") || "")) {
-      controls.date.value = parameters.get("start");
-    }
-    state.anchors = savedTrack.map(([lat, lng]) => L.latLng(lat, lng));
-    state.segments = state.anchors
-      .slice(1)
-      .map((point, index) => [state.anchors[index], point]);
-    savedStops.forEach(([lat, lng]) => renderWaypoint(L.latLng(lat, lng)));
-    renderTrack();
-    setStatus("Shared trip loaded.");
-    map.fitBounds(track.getBounds(), { padding: [30, 30] });
-  } catch {
-    setStatus("This shared trip URL could not be loaded.");
-  }
 }
 
 async function fetchNws(url, signal) {

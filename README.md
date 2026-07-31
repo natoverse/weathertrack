@@ -21,6 +21,23 @@ every day of a trip before you head out.
 - Additional sources may be integrated over time to expand coverage and
   redundancy.
 
+## Trip storage setup
+
+Shared trips are stored as JSON in
+[Firebase Realtime Database](https://firebase.google.com/docs/database). To
+configure storage:
+
+1. Create a Firebase project and a Realtime Database.
+2. Publish `database.rules.json` as the database's rules.
+3. Set `WEATHERTRACK_DATABASE_URL` in `firebase-config.js` to the database URL
+   shown in the Firebase console, such as
+   `https://PROJECT_ID-default-rtdb.firebaseio.com`.
+
+The database URL is public configuration, not a credential. The included rules
+allow a trip to be created once and fetched only with its random token; listing,
+editing, and deleting trips are denied. No Firebase user authentication is
+required.
+
 ## Status
 
 WeatherTrack is in early development. Features and documentation will evolve as

@@ -1,0 +1,1 @@
+window.WEATHERTRACK_DATABASE_URL = "";
