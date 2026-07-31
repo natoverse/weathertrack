@@ -82,6 +82,7 @@ const track = L.polyline([], {
   className: "trip-track",
 }).addTo(map);
 const trackDirections = L.layerGroup().addTo(map);
+const forecastMarkers = L.layerGroup().addTo(map);
 
 const state = {
   anchors: [],
@@ -1120,6 +1121,7 @@ function clearForecasts() {
   state.forecasting = false;
   state.forecastController?.abort();
   state.forecastController = null;
+  forecastMarkers.clearLayers();
   controls.forecastResults.replaceChildren();
   const message =
     state.waypoints.length === 0
@@ -1496,6 +1498,7 @@ async function loadForecast(target, signal) {
   return {
     date,
     label,
+    location,
     pageUrl: nwsPageUrl(location),
     place: [
       pointData?.properties?.relativeLocation?.properties?.city,
@@ -1520,6 +1523,102 @@ function addText(parent, elementName, text, className) {
   }
   parent.append(element);
   return element;
+}
+
+function forecastSummary(periods) {
+  const daytime = periods.filter(
+    (period) =>
+      period.isDaytime === true &&
+      Number.isFinite(period.temperature) &&
+      ["F", "C"].includes(period.temperatureUnit),
+  );
+  const nighttime = periods.filter(
+    (period) =>
+      period.isDaytime === false &&
+      Number.isFinite(period.temperature) &&
+      ["F", "C"].includes(period.temperatureUnit),
+  );
+  const iconPeriod = daytime[0] || periods[0];
+  const precipitation = periods
+    .map((period) => period?.probabilityOfPrecipitation?.value)
+    .filter(Number.isFinite);
+
+  return {
+    high: daytime.length
+      ? Math.max(...daytime.map((period) => period.temperature))
+      : null,
+    low: nighttime.length
+      ? Math.min(...nighttime.map((period) => period.temperature))
+      : null,
+    precipitation: precipitation.length ? Math.max(...precipitation) : null,
+    temperatureUnit:
+      daytime[0]?.temperatureUnit || nighttime[0]?.temperatureUnit,
+    icon: iconPeriod?.icon,
+    description: iconPeriod?.shortForecast || "Weather forecast",
+  };
+}
+
+function renderForecastMarker(result) {
+  if (
+    result.error ||
+    result.periods.length === 0 ||
+    !result.location ||
+    (!result.label.startsWith("Stop ") &&
+      !result.label.startsWith("Between stops "))
+  ) {
+    return;
+  }
+
+  const summary = forecastSummary(result.periods);
+  const badge = document.createElement("div");
+  badge.className = "forecast-map-badge";
+
+  if (typeof summary.icon === "string") {
+    try {
+      const iconUrl = nwsUrl(summary.icon);
+      const image = document.createElement("img");
+      image.src = iconUrl.href;
+      image.alt = summary.description;
+      badge.append(image);
+    } catch {
+      // The numeric summary remains useful if NWS omits a valid icon.
+    }
+  }
+
+  const values = document.createElement("div");
+  const temperature = document.createElement("strong");
+  const unit = summary.temperatureUnit ? `°${summary.temperatureUnit}` : "°";
+  if (summary.high !== null && summary.low !== null) {
+    temperature.textContent = `H ${summary.high}${unit} / L ${summary.low}${unit}`;
+  } else if (summary.high !== null) {
+    temperature.textContent = `H ${summary.high}${unit}`;
+  } else if (summary.low !== null) {
+    temperature.textContent = `L ${summary.low}${unit}`;
+  } else {
+    temperature.textContent = "Temp unavailable";
+  }
+  values.append(temperature);
+
+  const precipitation = document.createElement("span");
+  precipitation.textContent =
+    summary.precipitation === null
+      ? "Precip —"
+      : `Precip ${summary.precipitation}%`;
+  values.append(precipitation);
+  badge.append(values);
+
+  const marker = L.marker(result.location, {
+    icon: L.divIcon({
+      className: "forecast-map-icon",
+      html: badge,
+      iconAnchor: [-10, 25],
+      iconSize: [132, 50],
+    }),
+    interactive: true,
+    zIndexOffset: 500,
+  });
+  marker.bindTooltip(`${result.label}: ${summary.description}`);
+  forecastMarkers.addLayer(marker);
 }
 
 function renderForecast(result) {
@@ -1598,6 +1697,7 @@ async function updateForecasts() {
             ? "The NWS request timed out."
             : "The NWS forecast could not be loaded for this location.",
         label: target.label,
+        location: target.location,
         pageUrl: nwsPageUrl(target.location),
         periods: [],
       })),
@@ -1612,6 +1712,7 @@ async function updateForecasts() {
   state.forecasting = false;
   state.forecastController = null;
   results.forEach(renderForecast);
+  results.forEach(renderForecastMarker);
   const updated = new Date();
   controls.forecastStatus.value = `Updated ${updated.toLocaleString()}.`;
   controls.forecastStatus.textContent = `Updated ${updated.toLocaleString()}.`;
