@@ -199,10 +199,19 @@ button:disabled {
 }
 
 .profile-totals,
-.profile-status {
+.profile-status,
+.profile-help {
   margin: 0 0 0.5rem;
   color: #3f4a45;
   font-size: 0.8rem;
+}
+
+.profile-help {
+  margin-top: 0.25rem;
+}
+
+.elevation-chart:empty + .profile-help {
+  display: none;
 }
 
 .elevation-chart svg {
@@ -222,6 +231,16 @@ button:disabled {
   fill: #e8962e;
   stroke: #783f00;
   stroke-width: 2;
+  cursor: grab;
+  touch-action: none;
+}
+
+.elevation-chart circle.dragging {
+  cursor: grabbing;
+}
+
+.elevation-chart circle:focus-visible {
+  stroke-width: 4;
 }
 
 .day-summary {
