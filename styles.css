@@ -60,6 +60,19 @@ h1 {
   stroke-linejoin: round;
 }
 
+.track-direction-icon {
+  color: #fff;
+  font-size: 0.875rem;
+  line-height: 18px;
+  text-align: center;
+  filter: drop-shadow(0 0 1px #075985) drop-shadow(0 1px 1px rgb(0 0 0 / 80%));
+  pointer-events: none;
+}
+
+.track-direction-icon span {
+  display: block;
+}
+
 .trip-tools {
   position: absolute;
   z-index: 1000;

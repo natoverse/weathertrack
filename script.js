@@ -81,6 +81,7 @@ const track = L.polyline([], {
   opacity: 1,
   className: "trip-track",
 }).addTo(map);
+const trackDirections = L.layerGroup().addTo(map);
 
 const state = {
   anchors: [],
@@ -525,10 +526,76 @@ function renderTripProfile() {
   }
 }
 
+function renderTrackDirections(points) {
+  trackDirections.clearLayers();
+  if (points.length < 2) {
+    return;
+  }
+
+  const projected = points.map((point) => map.latLngToContainerPoint(point));
+  const viewport = L.bounds(L.point(0, 0), map.getSize());
+  const segments = [];
+  let totalLength = 0;
+  for (let index = 1; index < projected.length; index += 1) {
+    const clipped = L.LineUtil.clipSegment(
+      projected[index - 1],
+      projected[index],
+      viewport,
+    );
+    if (!clipped) {
+      continue;
+    }
+    const [start, end] = clipped;
+    const length = start.distanceTo(end);
+    if (length > 0) {
+      segments.push({ start, end, length, offset: totalLength });
+      totalLength += length;
+    }
+  }
+  if (totalLength < 32) {
+    return;
+  }
+
+  const indicatorCount = Math.min(100, Math.max(1, Math.floor(totalLength / 80)));
+  for (let index = 1; index <= indicatorCount; index += 1) {
+    const distance = (totalLength * index) / (indicatorCount + 1);
+    const segment =
+      segments.find(
+        ({ offset, length }) => distance <= offset + length,
+      ) || segments.at(-1);
+    const ratio = (distance - segment.offset) / segment.length;
+    const position = L.point(
+      segment.start.x + (segment.end.x - segment.start.x) * ratio,
+      segment.start.y + (segment.end.y - segment.start.y) * ratio,
+    );
+    const arrow = document.createElement("span");
+    arrow.textContent = "▶";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.style.transform = `rotate(${Math.atan2(
+      segment.end.y - segment.start.y,
+      segment.end.x - segment.start.x,
+    )}rad)`;
+    L.marker(map.containerPointToLatLng(position), {
+      icon: L.divIcon({
+        className: "track-direction-icon",
+        html: arrow,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      }),
+      interactive: false,
+      keyboard: false,
+    }).addTo(trackDirections);
+  }
+}
+
 function renderTrack() {
-  track.setLatLngs(trackPoints());
+  const points = trackPoints();
+  track.setLatLngs(points);
+  renderTrackDirections(points);
   renderTripProfile();
 }
+
+map.on("moveend resize", () => renderTrackDirections(trackPoints()));
 
 function invalidateElevationProfile() {
   state.profileRequest += 1;
