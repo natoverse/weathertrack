@@ -1064,6 +1064,13 @@ function nwsUrl(value) {
   return url;
 }
 
+function nwsPageUrl(location) {
+  const url = new URL("https://forecast.weather.gov/MapClick.php");
+  url.searchParams.set("lon", location.lng);
+  url.searchParams.set("lat", location.lat);
+  return url.href;
+}
+
 async function loadStopForecast(waypoint, index, signal) {
   const location = waypoint.marker.getLatLng();
   const pointUrl = new URL(
@@ -1082,6 +1089,7 @@ async function loadStopForecast(waypoint, index, signal) {
 
   return {
     date,
+    pageUrl: nwsPageUrl(location),
     place: [
       pointData?.properties?.relativeLocation?.properties?.city,
       pointData?.properties?.relativeLocation?.properties?.state,
@@ -1114,6 +1122,14 @@ function renderForecast(result, index) {
   if (result.place) {
     addText(card, "p", result.place);
   }
+
+  const pageLink = addText(
+    card,
+    "a",
+    "View forecast on weather.gov",
+    "forecast-detail",
+  );
+  pageLink.href = result.pageUrl;
 
   if (result.error) {
     addText(card, "p", result.error, "forecast-detail");
@@ -1170,6 +1186,7 @@ async function updateForecasts() {
           error.name === "AbortError"
             ? "The NWS request timed out."
             : "The NWS forecast could not be loaded for this stop.",
+        pageUrl: nwsPageUrl(waypoint.marker.getLatLng()),
         periods: [],
       })),
     ),
