@@ -50,6 +50,34 @@
           Select “New trip” to begin.
         </output>
         <ol id="waypoint-list" aria-label="Trip stops"></ol>
+        <section
+          id="trip-profile"
+          class="trip-profile"
+          aria-labelledby="trip-profile-title"
+          hidden
+        >
+          <h2 id="trip-profile-title">Trip profile</h2>
+          <p id="trip-mileage" class="trip-mileage"></p>
+          <p id="profile-totals" class="profile-totals"></p>
+          <div id="elevation-chart" class="elevation-chart"></div>
+          <p id="profile-status" class="profile-status" aria-live="polite"></p>
+          <div class="day-summary">
+            <table>
+              <caption>
+                Daily summary
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Day</th>
+                  <th scope="col">Miles</th>
+                  <th scope="col">Gain</th>
+                  <th scope="col">Descent</th>
+                </tr>
+              </thead>
+              <tbody id="day-summary-body"></tbody>
+            </table>
+          </div>
+        </section>
         <section class="forecast-panel" aria-labelledby="forecast-title">
           <div class="forecast-heading">
             <h2 id="forecast-title">NWS forecast</h2>

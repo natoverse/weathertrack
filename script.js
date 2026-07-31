@@ -21,6 +21,12 @@ const controls = {
   updateForecast: document.querySelector("#update-forecast"),
   forecastStatus: document.querySelector("#forecast-status"),
   forecastResults: document.querySelector("#forecast-results"),
+  tripProfile: document.querySelector("#trip-profile"),
+  tripMileage: document.querySelector("#trip-mileage"),
+  profileTotals: document.querySelector("#profile-totals"),
+  elevationChart: document.querySelector("#elevation-chart"),
+  profileStatus: document.querySelector("#profile-status"),
+  daySummaryBody: document.querySelector("#day-summary-body"),
 };
 
 const track = L.polyline([], {
@@ -41,7 +47,14 @@ const state = {
   forecastRequest: 0,
   forecastController: null,
   saving: false,
+  profileRequest: 0,
+  profileController: null,
+  elevationProfile: [],
+  profileLoading: false,
 };
+
+const METERS_PER_MILE = 1609.344;
+const FEET_PER_METER = 3.28084;
 
 function localDate() {
   const now = new Date();
@@ -90,12 +103,365 @@ function trackPoints() {
   ];
 }
 
+function trackMeasurements(points = trackPoints()) {
+  const distances = [0];
+  for (let index = 1; index < points.length; index += 1) {
+    distances.push(
+      distances[index - 1] + map.distance(points[index - 1], points[index]),
+    );
+  }
+  return { points, distances, total: distances.at(-1) || 0 };
+}
+
+function elevationAt(distance) {
+  const profile = state.elevationProfile;
+  if (profile.length === 0) {
+    return null;
+  }
+  const nextIndex = profile.findIndex((point) => point.distance >= distance);
+  if (nextIndex === -1) {
+    return profile.at(-1).elevation;
+  }
+  if (nextIndex === 0) {
+    return profile[0].elevation;
+  }
+  const start = profile[nextIndex - 1];
+  const end = profile[nextIndex];
+  const ratio = (distance - start.distance) / (end.distance - start.distance);
+  return start.elevation + (end.elevation - start.elevation) * ratio;
+}
+
+function elevationMetrics(startDistance, endDistance) {
+  if (state.elevationProfile.length === 0) {
+    return null;
+  }
+  const elevations = [
+    elevationAt(startDistance),
+    ...state.elevationProfile
+      .filter(
+        ({ distance }) =>
+          distance > startDistance && distance < endDistance,
+      )
+      .map(({ elevation }) => elevation),
+    elevationAt(endDistance),
+  ];
+  let gain = 0;
+  let descent = 0;
+  for (let index = 1; index < elevations.length; index += 1) {
+    const change = elevations[index] - elevations[index - 1];
+    if (change > 0) {
+      gain += change;
+    } else {
+      descent -= change;
+    }
+  }
+  return { gain, descent };
+}
+
+function distanceAlongTrack(location, measurements) {
+  const target = map.latLngToLayerPoint(location);
+  let result = 0;
+  let closestDistance = Infinity;
+
+  for (let index = 1; index < measurements.points.length; index += 1) {
+    const start = map.latLngToLayerPoint(measurements.points[index - 1]);
+    const end = map.latLngToLayerPoint(measurements.points[index]);
+    const delta = end.subtract(start);
+    const lengthSquared = delta.x * delta.x + delta.y * delta.y;
+    const ratio =
+      lengthSquared === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.min(
+              1,
+              ((target.x - start.x) * delta.x +
+                (target.y - start.y) * delta.y) /
+                lengthSquared,
+            ),
+          );
+    const candidate = L.point(
+      start.x + delta.x * ratio,
+      start.y + delta.y * ratio,
+    );
+    const candidateDistance = target.distanceTo(candidate);
+    if (candidateDistance < closestDistance) {
+      closestDistance = candidateDistance;
+      result =
+        measurements.distances[index - 1] +
+        (measurements.distances[index] -
+          measurements.distances[index - 1]) *
+          ratio;
+    }
+  }
+  return result;
+}
+
+function appendTableCell(row, text, header = false) {
+  const cell = document.createElement(header ? "th" : "td");
+  if (header) {
+    cell.scope = "row";
+  }
+  cell.textContent = text;
+  row.append(cell);
+}
+
+function renderElevationChart(measurements, stops) {
+  controls.elevationChart.replaceChildren();
+  if (state.elevationProfile.length === 0) {
+    return;
+  }
+
+  const width = 600;
+  const height = 180;
+  const padding = 8;
+  const elevations = state.elevationProfile.map(({ elevation }) => elevation);
+  const minimum = Math.min(...elevations);
+  const maximum = Math.max(...elevations);
+  const range = Math.max(maximum - minimum, 1);
+  const x = (distance) => (distance / measurements.total) * width;
+  const y = (elevation) =>
+    padding + ((maximum - elevation) / range) * (height - padding * 2);
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute(
+    "aria-label",
+    `Elevation profile from ${Math.round(minimum * FEET_PER_METER)} to ${Math.round(maximum * FEET_PER_METER)} feet`,
+  );
+  const area = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  const profilePath = state.elevationProfile
+    .map(
+      ({ distance, elevation }, index) =>
+        `${index === 0 ? "M" : "L"} ${x(distance)} ${y(elevation)}`,
+    )
+    .join(" ");
+  area.setAttribute(
+    "d",
+    `${profilePath} L ${width} ${height} L 0 ${height} Z`,
+  );
+  area.setAttribute("class", "profile-area");
+  svg.append(area);
+
+  stops.forEach(({ distance, number }) => {
+    const elevation = elevationAt(distance);
+    const marker = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "circle",
+    );
+    marker.setAttribute("cx", x(distance));
+    marker.setAttribute("cy", y(elevation));
+    marker.setAttribute("r", "6");
+    const title = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "title",
+    );
+    title.textContent = `Stop ${number}: ${(distance / METERS_PER_MILE).toFixed(1)} miles, ${Math.round(elevation * FEET_PER_METER)} feet`;
+    marker.append(title);
+    svg.append(marker);
+  });
+  controls.elevationChart.append(svg);
+}
+
+function renderTripProfile() {
+  const measurements = trackMeasurements();
+  const hasTrack = measurements.points.length >= 2 && measurements.total > 0;
+  controls.tripProfile.hidden = !hasTrack;
+  if (!hasTrack) {
+    return;
+  }
+
+  controls.tripMileage.textContent = `${(measurements.total / METERS_PER_MILE).toFixed(1)} miles`;
+  const stops = state.waypoints
+    .map(({ marker }, index) => ({
+      distance: distanceAlongTrack(marker.getLatLng(), measurements),
+      number: index + 1,
+    }))
+    .sort((first, second) => first.distance - second.distance);
+  const metrics = elevationMetrics(0, measurements.total);
+  controls.profileTotals.textContent = metrics
+    ? `${Math.round(metrics.gain * FEET_PER_METER).toLocaleString()} ft gain · ${Math.round(metrics.descent * FEET_PER_METER).toLocaleString()} ft descent`
+    : "";
+  controls.profileStatus.textContent = state.profileLoading
+    ? "Loading elevation…"
+    : state.elevationProfile.length === 0
+      ? "Elevation is unavailable."
+      : "";
+  renderElevationChart(measurements, stops);
+
+  const boundaries = [
+    0,
+    ...stops.map(({ distance }) => distance),
+    measurements.total,
+  ].filter(
+    (distance, index, values) =>
+      index === 0 || distance - values[index - 1] > 1,
+  );
+  controls.daySummaryBody.replaceChildren();
+  for (let index = 1; index < boundaries.length; index += 1) {
+    const start = boundaries[index - 1];
+    const end = boundaries[index];
+    const dayMetrics = elevationMetrics(start, end);
+    const row = document.createElement("tr");
+    appendTableCell(row, `Day ${index}`, true);
+    appendTableCell(row, ((end - start) / METERS_PER_MILE).toFixed(1));
+    appendTableCell(
+      row,
+      dayMetrics
+        ? `${Math.round(dayMetrics.gain * FEET_PER_METER).toLocaleString()} ft`
+        : "—",
+    );
+    appendTableCell(
+      row,
+      dayMetrics
+        ? `${Math.round(dayMetrics.descent * FEET_PER_METER).toLocaleString()} ft`
+        : "—",
+    );
+    controls.daySummaryBody.append(row);
+  }
+}
+
 function renderTrack() {
   track.setLatLngs(trackPoints());
+  renderTripProfile();
+}
+
+function invalidateElevationProfile() {
+  state.profileRequest += 1;
+  state.profileController?.abort();
+  state.profileController = null;
+  state.elevationProfile = [];
+  state.profileLoading = false;
+}
+
+function sampledTrack(measurements, maximumPoints = 200) {
+  const sampleCount = Math.min(
+    maximumPoints,
+    Math.max(
+      measurements.points.length,
+      Math.ceil(measurements.total / 100) + 1,
+    ),
+  );
+  if (sampleCount === measurements.points.length) {
+    return measurements.points.map((location, index) => ({
+      location,
+      distance: measurements.distances[index],
+    }));
+  }
+
+  const samples = [];
+  let segmentIndex = 1;
+  for (let index = 0; index < sampleCount; index += 1) {
+    const distance = (measurements.total * index) / (sampleCount - 1);
+    if (index === 0 || index === sampleCount - 1) {
+      samples.push({
+        distance,
+        location:
+          index === 0 ? measurements.points[0] : measurements.points.at(-1),
+      });
+      continue;
+    }
+    while (
+      segmentIndex < measurements.distances.length - 1 &&
+      measurements.distances[segmentIndex] <= distance
+    ) {
+      segmentIndex += 1;
+    }
+    const startDistance = measurements.distances[segmentIndex - 1];
+    const endDistance = measurements.distances[segmentIndex];
+    const ratio = (distance - startDistance) / (endDistance - startDistance);
+    const start = measurements.points[segmentIndex - 1];
+    const end = measurements.points[segmentIndex];
+    samples.push({
+      distance,
+      location: L.latLng(
+        start.lat + (end.lat - start.lat) * ratio,
+        start.lng + (end.lng - start.lng) * ratio,
+      ),
+    });
+  }
+  return samples;
+}
+
+async function fetchElevations(samples, signal) {
+  const response = await fetch("https://valhalla1.openstreetmap.de/height", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      shape: samples.map(({ location }) => ({
+        lat: location.lat,
+        lon: location.lng,
+      })),
+      range: true,
+    }),
+    referrerPolicy: "no-referrer",
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error("Elevation service unavailable");
+  }
+  const rangeHeight = (await response.json())?.range_height;
+  if (
+    !Array.isArray(rangeHeight) ||
+    rangeHeight.length !== samples.length ||
+    !rangeHeight.every(
+      (value) =>
+        Array.isArray(value) &&
+        value.length >= 2 &&
+        Number.isFinite(value[1]),
+    )
+  ) {
+    throw new Error("Elevation service returned invalid data");
+  }
+  return rangeHeight.map((value, index) => ({
+    distance: samples[index].distance,
+    elevation: value[1],
+  }));
+}
+
+async function loadElevationProfile() {
+  const measurements = trackMeasurements();
+  if (measurements.points.length < 2 || measurements.total === 0) {
+    return;
+  }
+  const request = state.profileRequest + 1;
+  state.profileRequest = request;
+  state.profileController?.abort();
+  const controller = new AbortController();
+  state.profileController = controller;
+  state.profileLoading = true;
+  state.elevationProfile = [];
+  renderTripProfile();
+  const timeout = window.setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const profile = await fetchElevations(
+      sampledTrack(measurements),
+      controller.signal,
+    );
+    if (request === state.profileRequest) {
+      state.elevationProfile = profile;
+    }
+  } catch {
+    if (request === state.profileRequest) {
+      state.elevationProfile = [];
+    }
+  } finally {
+    window.clearTimeout(timeout);
+    if (request === state.profileRequest) {
+      state.profileLoading = false;
+      state.profileController = null;
+      renderTripProfile();
+    }
+  }
 }
 
 function clearTrip() {
   state.routeRequest += 1;
+  invalidateElevationProfile();
   state.anchors = [];
   state.segments = [];
   state.recording = false;
@@ -194,6 +560,7 @@ async function addTrackPoint(point) {
   }
 
   if (state.anchors.length === 0) {
+    invalidateElevationProfile();
     state.anchors.push(point);
     renderTrack();
     setStatus("Start set. Click the map to continue the track.");
@@ -228,6 +595,7 @@ async function addTrackPoint(point) {
     return;
   }
 
+  invalidateElevationProfile();
   state.anchors.push(point);
   state.segments.push(segment);
   state.routing = false;
@@ -291,6 +659,7 @@ function renderWaypoint(location) {
   controls.waypointList.append(item);
   state.waypoints.push({ marker, item });
   clearForecasts();
+  renderTripProfile();
 }
 
 function addWaypoint(point) {
@@ -435,6 +804,7 @@ function loadSavedTrip(trip) {
     throw new Error("Invalid trip");
   }
 
+  invalidateElevationProfile();
   controls.name.value = trip.name;
   if (trip.start !== undefined) {
     controls.date.value = trip.start;
@@ -448,6 +818,7 @@ function loadSavedTrip(trip) {
   setStatus("Shared trip loaded.");
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
   updateControls();
+  loadElevationProfile();
 }
 
 function loadLegacyTrip(parameters) {
@@ -656,6 +1027,7 @@ controls.newTrip.addEventListener("click", () => {
 });
 
 controls.undo.addEventListener("click", () => {
+  invalidateElevationProfile();
   state.anchors.pop();
   if (state.segments.length > 0) {
     state.segments.pop();
@@ -675,6 +1047,7 @@ controls.finish.addEventListener("click", () => {
   setStatus("Track finished. Select “Add stop,” then click along the track.");
   updateControls();
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
+  loadElevationProfile();
 });
 
 controls.addWaypoint.addEventListener("click", () => {
