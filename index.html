@@ -19,54 +19,85 @@
     </header>
     <div class="app-shell">
       <main id="map" aria-label="Interactive trip planning map"></main>
-      <section class="trip-tools" aria-labelledby="trip-tools-title">
-        <h2 id="trip-tools-title">Plan a trip</h2>
-        <p class="instructions">
-          Start a trip, then click the map to plot its track.
-        </p>
-        <div id="trip-details" hidden>
-          <label class="trip-name">
-            Trip name
-            <input id="trip-name" type="text" maxlength="100" />
-          </label>
-          <label class="trip-date">
-            Trip start date
-            <input id="trip-date" type="date" />
-          </label>
-        </div>
-        <div class="tool-buttons">
-          <button id="new-trip" type="button">New trip</button>
-          <button id="undo-point" type="button" disabled>Undo</button>
-          <button id="finish-track" type="button" disabled>
-            Finish track
+      <section class="trip-tools" aria-label="Trip tools">
+        <div class="tabs" role="tablist" aria-label="Trip tools">
+          <button
+            id="planner-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="planner-panel"
+          >
+            Plan a trip
           </button>
-          <button id="add-waypoint" type="button" disabled>Add stop</button>
-          <button id="save-trip" type="button" disabled>Save</button>
-          <button id="clear-trip" type="button" disabled>Clear</button>
+          <button
+            id="trips-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="trips-panel"
+          >
+            All trips
+          </button>
         </div>
-        <label class="snap-option">
-          <input id="snap-to-routes" type="checkbox" checked />
-          Snap to trails and roads when available
-        </label>
-        <output id="trip-status" aria-live="polite">
-          Select “New trip” to begin.
-        </output>
-        <ol id="waypoint-list" aria-label="Trip stops"></ol>
-        <section class="forecast-panel" aria-labelledby="forecast-title">
-          <div class="forecast-heading">
-            <h2 id="forecast-title">NWS forecast</h2>
-            <button id="update-forecast" type="button" disabled>Update</button>
-          </div>
-          <p class="forecast-help">
-            Stop 1 uses the trip start date; each following stop is one day
-            later.
+        <section id="planner-panel" role="tabpanel" aria-labelledby="planner-tab">
+          <p class="instructions">
+            Start a trip, then click the map to plot its track.
           </p>
-          <output id="forecast-status" aria-live="polite">
-            Add a stop to load its NWS forecast.
+          <div id="trip-details" hidden>
+            <label class="trip-name">
+              Trip name
+              <input id="trip-name" type="text" maxlength="100" />
+            </label>
+            <label class="trip-date">
+              Trip start date
+              <input id="trip-date" type="date" />
+            </label>
+          </div>
+          <div class="tool-buttons">
+            <button id="new-trip" type="button">New trip</button>
+            <button id="undo-point" type="button" disabled>Undo</button>
+            <button id="finish-track" type="button" disabled>
+              Finish track
+            </button>
+            <button id="add-waypoint" type="button" disabled>Add stop</button>
+            <button id="save-trip" type="button" disabled>Save</button>
+            <button id="clear-trip" type="button" disabled>Clear</button>
+          </div>
+          <label class="snap-option">
+            <input id="snap-to-routes" type="checkbox" checked />
+            Snap to trails and roads when available
+          </label>
+          <output id="trip-status" aria-live="polite">
+            Select “New trip” to begin.
           </output>
-          <div id="forecast-results"></div>
+          <ol id="waypoint-list" aria-label="Trip stops"></ol>
+          <section class="forecast-panel" aria-labelledby="forecast-title">
+            <div class="forecast-heading">
+              <h2 id="forecast-title">NWS forecast</h2>
+              <button id="update-forecast" type="button" disabled>Update</button>
+            </div>
+            <p class="forecast-help">
+              Stop 1 uses the trip start date; each following stop is one day
+              later.
+            </p>
+            <output id="forecast-status" aria-live="polite">
+              Add a stop to load its NWS forecast.
+            </output>
+            <div id="forecast-results"></div>
+          </section>
+          <small>Routing data © OpenStreetMap contributors</small>
         </section>
-        <small>Routing data © OpenStreetMap contributors</small>
+        <section
+          id="trips-panel"
+          role="tabpanel"
+          aria-labelledby="trips-tab"
+          hidden
+        >
+          <p class="instructions">Load or delete a saved trip.</p>
+          <output id="trip-list-status" aria-live="polite">Loading trips…</output>
+          <ul id="trip-list" aria-label="Saved trips"></ul>
+        </section>
       </section>
     </div>
     <script

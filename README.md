@@ -34,9 +34,8 @@ configure storage:
    `https://PROJECT_ID-default-rtdb.firebaseio.com`.
 
 The database URL is public configuration, not a credential. The included rules
-allow a trip to be created once and fetched only with its random token; listing,
-editing, and deleting trips are denied. No Firebase user authentication is
-required.
+allow anyone to list, load, create, and delete trips; editing an existing trip
+is denied. No Firebase user authentication is required.
 
 ## Status
 

@@ -3,9 +3,10 @@
     ".read": false,
     ".write": false,
     "trips": {
+      ".read": true,
       "$token": {
         ".read": "$token.matches(/^[a-f0-9]{32}$/)",
-        ".write": "$token.matches(/^[a-f0-9]{32}$/) && !data.exists()",
+        ".write": "$token.matches(/^[a-f0-9]{32}$/) && (!data.exists() || !newData.exists())",
         ".validate": "newData.hasChildren(['name', 'track']) && newData.child('track').hasChildren(['0', '1'])",
         "name": {
           ".validate": "newData.isString() && newData.val().length <= 100"
