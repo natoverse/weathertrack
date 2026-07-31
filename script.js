@@ -1268,6 +1268,15 @@ function forecastTargets() {
   const measurements = trackMeasurements();
   const locations = state.waypoints.map(({ marker }) => marker.getLatLng());
   const targets = [];
+  const firstLocation = locations[0];
+
+  if (firstLocation) {
+    targets.push({
+      date: stopDate(-1),
+      label: "Day before Stop 1",
+      location: firstLocation,
+    });
+  }
 
   locations.forEach((location, index) => {
     targets.push({
