@@ -1539,11 +1539,17 @@ function forecastTargets() {
 
   const lastLocation = locations.at(-1);
   if (lastLocation) {
+    const lastStopDistance = distanceAlongTrack(lastLocation, measurements);
     targets.push({
       badgeLabel: `${stopDay(locations.length)} after Stop ${locations.length}`,
       date: stopDate(locations.length),
       label: `Day after Stop ${locations.length}`,
-      location: lastLocation,
+      location: midpointForecastLocation(
+        lastStopDistance,
+        measurements.total,
+        measurements,
+        locations,
+      ),
     });
   }
   return targets;
