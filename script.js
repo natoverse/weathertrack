@@ -108,6 +108,8 @@ const state = {
 
 const METERS_PER_MILE = 1609.344;
 const FEET_PER_METER = 3.28084;
+const FORECAST_MARKER_SIZE = [132, 50];
+const FORECAST_MARKER_PADDING = 8;
 
 function localDate() {
   const now = new Date();
@@ -1120,16 +1122,19 @@ function stopDate(index) {
   return date.toISOString().slice(0, 10);
 }
 
+function stopDay(index) {
+  return new Date(`${stopDate(index)}T00:00:00Z`).toLocaleDateString(
+    undefined,
+    { timeZone: "UTC", weekday: "long" },
+  );
+}
+
 function stopLabel(index) {
   const number = index + 1;
   if (!validDate(controls.date.value)) {
     return `Stop ${number}`;
   }
-  const day = new Date(`${stopDate(index)}T00:00:00Z`).toLocaleDateString(
-    undefined,
-    { timeZone: "UTC", weekday: "long" },
-  );
-  return `Stop ${number} - ${day}`;
+  return `Stop ${number} - ${stopDay(index)} night`;
 }
 
 function updateWaypointLabels() {
@@ -1462,6 +1467,42 @@ function nwsPageUrl(location) {
   return url.href;
 }
 
+function forecastMarkersOverlap(firstLocation, secondLocation) {
+  const first = map.latLngToLayerPoint(firstLocation);
+  const second = map.latLngToLayerPoint(secondLocation);
+  return (
+    Math.abs(first.x - second.x) <
+      FORECAST_MARKER_SIZE[0] + FORECAST_MARKER_PADDING &&
+    Math.abs(first.y - second.y) <
+      FORECAST_MARKER_SIZE[1] + FORECAST_MARKER_PADDING
+  );
+}
+
+function midpointForecastLocation(
+  startDistance,
+  endDistance,
+  measurements,
+  stopLocations,
+) {
+  const midpoint = (startDistance + endDistance) / 2;
+  const candidates = [midpoint];
+  const forwardDistance = Math.max(startDistance, endDistance) - midpoint;
+
+  for (let step = 1; step < 10; step += 1) {
+    candidates.push(midpoint + forwardDistance * (step / 10));
+  }
+
+  const availableLocation = candidates
+    .map((distance) => locationAlongTrack(distance, measurements))
+    .find(
+      (candidate) =>
+        !stopLocations.some((stop) =>
+          forecastMarkersOverlap(candidate, stop),
+        ),
+    );
+  return availableLocation || locationAlongTrack(midpoint, measurements);
+}
+
 function forecastTargets() {
   const measurements = trackMeasurements();
   const locations = state.waypoints.map(({ marker }) => marker.getLatLng());
@@ -1490,10 +1531,12 @@ function forecastTargets() {
       targets.push({
         date: stopDate(index + 1),
         daytimeOnly: true,
-        label: `Between stops ${index + 1} and ${index + 2}`,
-        location: locationAlongTrack(
-          (startDistance + endDistance) / 2,
+        label: `Between stops ${index + 1} and ${index + 2} - ${stopDay(index + 1)}`,
+        location: midpointForecastLocation(
+          startDistance,
+          endDistance,
           measurements,
+          locations,
         ),
       });
     }
@@ -1643,7 +1686,7 @@ function renderForecastMarker(result) {
       className: "forecast-map-icon",
       html: badge,
       iconAnchor: [-10, 25],
-      iconSize: [132, 50],
+      iconSize: FORECAST_MARKER_SIZE,
     }),
     interactive: true,
     zIndexOffset: 500,
