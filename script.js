@@ -7,6 +7,7 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 const controls = {
+  tripDetails: document.querySelector("#trip-details"),
   name: document.querySelector("#trip-name"),
   date: document.querySelector("#trip-date"),
   newTrip: document.querySelector("#new-trip"),
@@ -24,15 +25,17 @@ const controls = {
 };
 
 const track = L.polyline([], {
-  color: "#1769aa",
-  weight: 5,
-  opacity: 0.9,
+  color: "#075985",
+  weight: 7,
+  opacity: 1,
+  className: "trip-track",
 }).addTo(map);
 
 const state = {
   anchors: [],
   segments: [],
   waypoints: [],
+  tripStarted: false,
   recording: false,
   placingWaypoint: false,
   routing: false,
@@ -58,6 +61,10 @@ function setStatus(message) {
 
 function updateControls() {
   const hasTrack = state.anchors.length > 0;
+  controls.tripDetails.hidden = !state.tripStarted;
+  map
+    .getContainer()
+    .classList.toggle("map-editing", state.recording || state.placingWaypoint);
   controls.undo.disabled = !state.recording || !hasTrack || state.routing;
   controls.finish.disabled =
     !state.recording || state.anchors.length < 2 || state.routing;
@@ -103,6 +110,7 @@ function clearTrip() {
   state.routing = false;
   state.waypoints.forEach(({ marker }) => marker.remove());
   state.waypoints = [];
+  state.tripStarted = false;
   clearForecasts();
   controls.name.value = "";
   controls.date.value = localDate();
@@ -435,6 +443,7 @@ function loadSavedTrip(trip) {
     throw new Error("Invalid trip");
   }
 
+  state.tripStarted = true;
   controls.name.value = trip.name;
   if (trip.start !== undefined) {
     controls.date.value = trip.start;
@@ -650,6 +659,7 @@ async function updateForecasts() {
 
 controls.newTrip.addEventListener("click", () => {
   clearTrip();
+  state.tripStarted = true;
   state.recording = true;
   setStatus("Click the map to set the start of the track.");
   updateControls();

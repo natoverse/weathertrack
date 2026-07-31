@@ -24,14 +24,16 @@
         <p class="instructions">
           Start a trip, then click the map to plot its track.
         </p>
-        <label class="trip-name">
-          Trip name
-          <input id="trip-name" type="text" maxlength="100" />
-        </label>
-        <label class="trip-date">
-          Trip start date
-          <input id="trip-date" type="date" />
-        </label>
+        <div id="trip-details" hidden>
+          <label class="trip-name">
+            Trip name
+            <input id="trip-name" type="text" maxlength="100" />
+          </label>
+          <label class="trip-date">
+            Trip start date
+            <input id="trip-date" type="date" />
+          </label>
+        </div>
         <div class="tool-buttons">
           <button id="new-trip" type="button">New trip</button>
           <button id="undo-point" type="button" disabled>Undo</button>
