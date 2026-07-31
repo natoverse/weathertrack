@@ -100,6 +100,7 @@ const state = {
   savedTripToken: null,
   importing: false,
   listingTrips: false,
+  tripLoadRequest: 0,
   profileRequest: 0,
   profileController: null,
   elevationProfile: [],
@@ -180,6 +181,7 @@ function updateControls() {
     !validDate(controls.date.value) ||
     state.routing ||
     state.importing ||
+    state.profileLoading ||
     state.forecasting;
 }
 
@@ -711,6 +713,7 @@ async function loadElevationProfile() {
   state.profileLoading = true;
   state.elevationProfile = [];
   renderTripProfile();
+  updateControls();
   const timeout = window.setTimeout(() => controller.abort(), 12000);
 
   try {
@@ -731,11 +734,13 @@ async function loadElevationProfile() {
       state.profileLoading = false;
       state.profileController = null;
       renderTripProfile();
+      updateControls();
     }
   }
 }
 
 function clearTrip() {
+  state.tripLoadRequest += 1;
   state.routeRequest += 1;
   invalidateElevationProfile();
   state.anchors = [];
@@ -1242,15 +1247,28 @@ function validTripSummary(trip) {
   );
 }
 
-function loadListedTrip(token, trip) {
+async function loadListedTrip(token, trip) {
   clearTrip();
-  loadSavedTrip(trip);
+  const request = state.tripLoadRequest;
+  const loadingTrip = loadSavedTrip(trip);
   state.savedTripToken = token;
-  const url = new URL(window.location.href);
-  url.search = "";
-  url.searchParams.set("trip", token);
-  window.history.replaceState(null, "", url);
-  selectTab("planner");
+  try {
+    await loadingTrip;
+    if (request !== state.tripLoadRequest) {
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("trip", token);
+    window.history.replaceState(null, "", url);
+    selectTab("planner");
+  } catch {
+    if (request !== state.tripLoadRequest) {
+      return;
+    }
+    state.savedTripToken = null;
+    setStatus("This trip could not be loaded.");
+  }
 }
 
 async function deleteListedTrip(token, name) {
@@ -1340,7 +1358,7 @@ async function loadTripList() {
   }
 }
 
-function loadSavedTrip(trip) {
+async function loadSavedTrip(trip) {
   const stops = trip?.stops ?? [];
   if (
     typeof trip?.name !== "string" ||
@@ -1372,7 +1390,7 @@ function loadSavedTrip(trip) {
   setStatus("Shared trip loaded.");
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
   updateControls();
-  loadElevationProfile();
+  await loadElevationProfile();
   if (stops.length > 0 && validDate(controls.date.value)) {
     updateForecasts();
   }
@@ -1387,7 +1405,7 @@ function loadLegacyTrip(parameters) {
   if (parameters.has("start")) {
     trip.start = parameters.get("start");
   }
-  loadSavedTrip(trip);
+  return loadSavedTrip(trip);
 }
 
 async function loadTrip() {
@@ -1399,7 +1417,7 @@ async function loadTrip() {
 
   try {
     if (!token) {
-      loadLegacyTrip(parameters);
+      await loadLegacyTrip(parameters);
       return;
     }
     if (!/^[a-f0-9]{32}$/.test(token)) {
@@ -1414,9 +1432,11 @@ async function loadTrip() {
     if (!response.ok) {
       throw new Error("Trip storage is unavailable");
     }
-    loadSavedTrip(await response.json());
+    const loadingTrip = loadSavedTrip(await response.json());
     state.savedTripToken = token;
+    await loadingTrip;
   } catch {
+    state.savedTripToken = null;
     setStatus("This shared trip URL could not be loaded.");
   }
 }
@@ -1496,6 +1516,32 @@ function midpointForecastLocation(
   return availableLocation || locationAlongTrack(midpoint, measurements);
 }
 
+function highPointForecastTarget(measurements, locations) {
+  if (state.elevationProfile.length === 0) {
+    return null;
+  }
+  const highPoint = state.elevationProfile.reduce((highest, point) =>
+    point.elevation > highest.elevation ? point : highest,
+  );
+  const stopDistances = locations.map((location) =>
+    distanceAlongTrack(location, measurements),
+  ).sort((first, second) => first - second);
+  const nextStopIndex = stopDistances.findIndex(
+    (distance) => distance >= highPoint.distance,
+  );
+  const dayIndex =
+    nextStopIndex === -1 ? stopDistances.length : nextStopIndex;
+
+  return {
+    badgeLabel: `${stopDay(dayIndex)} high point`,
+    date: stopDate(dayIndex),
+    daytimeOnly: true,
+    iconAnchor: [FORECAST_MARKER_SIZE[0] + 10, 36],
+    label: `High point - ${stopDay(dayIndex)}`,
+    location: locationAlongTrack(highPoint.distance, measurements),
+  };
+}
+
 function forecastTargets() {
   const measurements = trackMeasurements();
   const locations = state.waypoints.map(({ marker }) => marker.getLatLng());
@@ -1537,6 +1583,11 @@ function forecastTargets() {
     }
   });
 
+  const highPointTarget = highPointForecastTarget(measurements, locations);
+  if (highPointTarget) {
+    targets.push(highPointTarget);
+  }
+
   const lastLocation = locations.at(-1);
   if (lastLocation) {
     const lastStopDistance = distanceAlongTrack(lastLocation, measurements);
@@ -1556,7 +1607,7 @@ function forecastTargets() {
 }
 
 async function loadForecast(target, signal) {
-  const { badgeLabel, date, daytimeOnly, label, location } = target;
+  const { badgeLabel, date, daytimeOnly, iconAnchor, label, location } = target;
   const pointUrl = new URL(
     `https://api.weather.gov/points/${location.lat.toFixed(4)},${location.lng.toFixed(4)}`,
   );
@@ -1573,6 +1624,7 @@ async function loadForecast(target, signal) {
   return {
     badgeLabel,
     date,
+    iconAnchor,
     label,
     location,
     pageUrl: nwsPageUrl(location),
@@ -1639,9 +1691,7 @@ function renderForecastMarker(result) {
     result.error ||
     result.periods.length === 0 ||
     !result.location ||
-    (!result.label.startsWith("Stop ") &&
-      !result.label.startsWith("Between stops ") &&
-      !result.label.startsWith("Day after Stop "))
+    !result.badgeLabel
   ) {
     return;
   }
@@ -1697,7 +1747,7 @@ function renderForecastMarker(result) {
     icon: L.divIcon({
       className: "forecast-map-icon",
       html: badge,
-      iconAnchor: [-10, 36],
+      iconAnchor: result.iconAnchor || [-10, 36],
       iconSize: FORECAST_MARKER_SIZE,
     }),
     interactive: true,
