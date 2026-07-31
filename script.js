@@ -1,10 +1,39 @@
 const map = L.map("map").setView([39.5, -98.35], 4);
 
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-}).addTo(map);
+const streetLayer = L.tileLayer(
+  "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
+).addTo(map);
+
+const satelliteLayer = L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  {
+    maxZoom: 19,
+    attribution:
+      "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+  },
+);
+
+const topographicLayer = L.tileLayer(
+  "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 17,
+    attribution:
+      'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+  },
+);
+
+L.control
+  .layers({
+    Street: streetLayer,
+    Satellite: satelliteLayer,
+    Topographic: topographicLayer,
+  })
+  .addTo(map);
 
 const controls = {
   plannerTab: document.querySelector("#planner-tab"),
