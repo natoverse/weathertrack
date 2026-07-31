@@ -7,7 +7,7 @@ const streetLayer = L.tileLayer(
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
-).addTo(map);
+);
 
 const satelliteLayer = L.tileLayer(
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -25,7 +25,7 @@ const topographicLayer = L.tileLayer(
     attribution:
       'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
   },
-);
+).addTo(map);
 
 L.control
   .layers(
@@ -281,21 +281,20 @@ function distanceAlongTrack(location, measurements) {
 }
 
 function locationAlongTrack(distance, measurements) {
-  const nextIndex = measurements.distances.findIndex(
-    (pointDistance) => pointDistance >= distance,
+  const segmentIndex = measurements.distances.findIndex(
+    (segmentDistance) => segmentDistance >= distance,
   );
-  if (nextIndex <= 0) {
+  if (segmentIndex <= 0) {
     return measurements.points[0];
   }
-  if (nextIndex === -1) {
+  if (segmentIndex === -1) {
     return measurements.points.at(-1);
   }
-
-  const startDistance = measurements.distances[nextIndex - 1];
-  const endDistance = measurements.distances[nextIndex];
+  const startDistance = measurements.distances[segmentIndex - 1];
+  const endDistance = measurements.distances[segmentIndex];
   const ratio = (distance - startDistance) / (endDistance - startDistance);
-  const start = measurements.points[nextIndex - 1];
-  const end = measurements.points[nextIndex];
+  const start = measurements.points[segmentIndex - 1];
+  const end = measurements.points[segmentIndex];
   return L.latLng(
     start.lat + (end.lat - start.lat) * ratio,
     start.lng + (end.lng - start.lng) * ratio,
@@ -348,22 +347,118 @@ function renderElevationChart(measurements, stops) {
   area.setAttribute("class", "profile-area");
   svg.append(area);
 
-  stops.forEach(({ distance, number }) => {
-    const elevation = elevationAt(distance);
-    const marker = document.createElementNS(
+  stops.forEach((stop) => {
+    let distance = stop.distance;
+    const dot = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "circle",
     );
-    marker.setAttribute("cx", x(distance));
-    marker.setAttribute("cy", y(elevation));
-    marker.setAttribute("r", "6");
+    dot.setAttribute("r", "6");
+    dot.setAttribute("role", "slider");
+    dot.setAttribute("tabindex", "0");
+    dot.setAttribute("aria-orientation", "horizontal");
+    dot.setAttribute("aria-valuemin", "0");
+    dot.setAttribute(
+      "aria-valuemax",
+      (measurements.total / METERS_PER_MILE).toFixed(1),
+    );
+    dot.dataset.stopNumber = stop.number;
     const title = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "title",
     );
-    title.textContent = `Stop ${number}: ${(distance / METERS_PER_MILE).toFixed(1)} miles, ${Math.round(elevation * FEET_PER_METER)} feet`;
-    marker.append(title);
-    svg.append(marker);
+    dot.append(title);
+
+    const updateStop = (nextDistance) => {
+      distance = Math.max(0, Math.min(measurements.total, nextDistance));
+      const elevation = elevationAt(distance);
+      const miles = (distance / METERS_PER_MILE).toFixed(1);
+      stop.waypoint.marker.setLatLng(
+        locationAlongTrack(distance, measurements),
+      );
+      dot.setAttribute("cx", x(distance));
+      dot.setAttribute("cy", y(elevation));
+      dot.setAttribute("aria-label", `Stop ${stop.number}`);
+      dot.setAttribute("aria-valuenow", miles);
+      dot.setAttribute("aria-valuetext", `${miles} miles`);
+      title.textContent = `Stop ${stop.number}: ${miles} miles, ${Math.round(elevation * FEET_PER_METER)} feet`;
+    };
+    const commitStopMove = () => {
+      clearForecasts();
+      renderTripProfile();
+      setStatus(
+        `Stop ${stop.number} moved to ${(distance / METERS_PER_MILE).toFixed(1)} miles.`,
+      );
+    };
+    updateStop(distance);
+
+    let pointerId = null;
+    let moved = false;
+    dot.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      pointerId = event.pointerId;
+      moved = false;
+      dot.classList.add("dragging");
+      dot.setPointerCapture(pointerId);
+    });
+    dot.addEventListener("pointermove", (event) => {
+      if (event.pointerId !== pointerId) {
+        return;
+      }
+      event.preventDefault();
+      const bounds = svg.getBoundingClientRect();
+      if (bounds.width === 0) {
+        return;
+      }
+      const nextDistance =
+        ((event.clientX - bounds.left) / bounds.width) * measurements.total;
+      if (Math.abs(nextDistance - distance) > 0.01) {
+        updateStop(nextDistance);
+        moved = true;
+      }
+    });
+    const finishDrag = (event) => {
+      if (event.pointerId !== pointerId) {
+        return;
+      }
+      pointerId = null;
+      dot.classList.remove("dragging");
+      if (dot.hasPointerCapture(event.pointerId)) {
+        dot.releasePointerCapture(event.pointerId);
+      }
+      if (moved) {
+        commitStopMove();
+      }
+    };
+    dot.addEventListener("pointerup", finishDrag);
+    dot.addEventListener("pointercancel", finishDrag);
+    dot.addEventListener("lostpointercapture", finishDrag);
+    dot.addEventListener("keydown", (event) => {
+      const step =
+        measurements.total * (event.shiftKey ? 0.05 : 0.01);
+      let nextDistance = distance;
+      if (event.key === "ArrowLeft") {
+        nextDistance -= step;
+      } else if (event.key === "ArrowRight") {
+        nextDistance += step;
+      } else if (event.key === "Home") {
+        nextDistance = 0;
+      } else if (event.key === "End") {
+        nextDistance = measurements.total;
+      } else {
+        return;
+      }
+      event.preventDefault();
+      updateStop(nextDistance);
+      commitStopMove();
+      controls.elevationChart
+        .querySelector(`[data-stop-number="${stop.number}"]`)
+        ?.focus();
+    });
+    svg.append(dot);
   });
   controls.elevationChart.append(svg);
 }
@@ -378,8 +473,9 @@ function renderTripProfile() {
 
   controls.tripMileage.textContent = `${(measurements.total / METERS_PER_MILE).toFixed(1)} miles`;
   const stops = state.waypoints
-    .map(({ marker }, index) => ({
-      distance: distanceAlongTrack(marker.getLatLng(), measurements),
+    .map((waypoint, index) => ({
+      waypoint,
+      distance: distanceAlongTrack(waypoint.marker.getLatLng(), measurements),
       number: index + 1,
     }))
     .sort((first, second) => first.distance - second.distance);
