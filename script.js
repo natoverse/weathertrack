@@ -28,11 +28,15 @@ const topographicLayer = L.tileLayer(
 );
 
 L.control
-  .layers({
-    Street: streetLayer,
-    Satellite: satelliteLayer,
-    Topographic: topographicLayer,
-  })
+  .layers(
+    {
+      Street: streetLayer,
+      Satellite: satelliteLayer,
+      Topographic: topographicLayer,
+    },
+    null,
+    { position: "topleft" },
+  )
   .addTo(map);
 
 const controls = {
