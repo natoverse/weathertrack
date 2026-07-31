@@ -569,7 +569,7 @@ function renderTrackDirections(points) {
       segment.start.y + (segment.end.y - segment.start.y) * ratio,
     );
     const arrow = document.createElement("span");
-    arrow.textContent = "▶";
+    arrow.textContent = "›";
     arrow.setAttribute("aria-hidden", "true");
     arrow.style.transform = `rotate(${Math.atan2(
       segment.end.y - segment.start.y,
