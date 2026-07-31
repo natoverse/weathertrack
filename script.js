@@ -7,6 +7,10 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 const controls = {
+  plannerTab: document.querySelector("#planner-tab"),
+  tripsTab: document.querySelector("#trips-tab"),
+  plannerPanel: document.querySelector("#planner-panel"),
+  tripsPanel: document.querySelector("#trips-panel"),
   tripDetails: document.querySelector("#trip-details"),
   name: document.querySelector("#trip-name"),
   date: document.querySelector("#trip-date"),
@@ -22,6 +26,8 @@ const controls = {
   updateForecast: document.querySelector("#update-forecast"),
   forecastStatus: document.querySelector("#forecast-status"),
   forecastResults: document.querySelector("#forecast-results"),
+  tripListStatus: document.querySelector("#trip-list-status"),
+  tripList: document.querySelector("#trip-list"),
   tripProfile: document.querySelector("#trip-profile"),
   tripMileage: document.querySelector("#trip-mileage"),
   profileTotals: document.querySelector("#profile-totals"),
@@ -50,6 +56,7 @@ const state = {
   forecastRequest: 0,
   forecastController: null,
   saving: false,
+  listingTrips: false,
   profileRequest: 0,
   profileController: null,
   elevationProfile: [],
@@ -70,6 +77,19 @@ controls.date.value = localDate();
 function setStatus(message) {
   controls.status.value = message;
   controls.status.textContent = message;
+}
+
+function setTripListStatus(message) {
+  controls.tripListStatus.value = message;
+  controls.tripListStatus.textContent = message;
+}
+
+function selectTab(tab) {
+  const showingPlanner = tab === "planner";
+  controls.plannerTab.setAttribute("aria-selected", showingPlanner);
+  controls.tripsTab.setAttribute("aria-selected", !showingPlanner);
+  controls.plannerPanel.hidden = !showingPlanner;
+  controls.tripsPanel.hidden = showingPlanner;
 }
 
 function updateControls() {
@@ -745,7 +765,8 @@ function tripStorageUrl(token) {
   ) {
     throw new Error("Trip storage URL is invalid");
   }
-  url.pathname = `${url.pathname.replace(/\/$/, "")}/trips/${token}.json`;
+  const tripPath = `/trips${token ? `/${token}` : ""}.json`;
+  url.pathname = `${url.pathname.replace(/\/$/, "")}${tripPath}`;
   url.search = "";
   url.hash = "";
   return url;
@@ -787,11 +808,117 @@ async function saveTrip() {
     url.searchParams.set("trip", token);
     window.history.replaceState(null, "", url);
     setStatus("Trip saved. Copy this page’s URL to share it.");
+    loadTripList();
   } catch {
     setStatus("The trip could not be saved. Please try again.");
   } finally {
     state.saving = false;
     updateControls();
+  }
+}
+
+function validTripSummary(trip) {
+  return (
+    typeof trip?.name === "string" &&
+    trip.name.length <= 100 &&
+    (trip.start === undefined || validDate(trip.start))
+  );
+}
+
+function loadListedTrip(token, trip) {
+  clearTrip();
+  loadSavedTrip(trip);
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.searchParams.set("trip", token);
+  window.history.replaceState(null, "", url);
+  selectTab("planner");
+}
+
+async function deleteListedTrip(token, name) {
+  if (!window.confirm(`Delete “${name || "Untitled trip"}”?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(tripStorageUrl(token), {
+      method: "DELETE",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) {
+      throw new Error("Trip storage is unavailable");
+    }
+    setTripListStatus("Trip deleted.");
+    loadTripList();
+  } catch {
+    setTripListStatus("The trip could not be deleted. Please try again.");
+  }
+}
+
+function renderTripList(trips) {
+  controls.tripList.replaceChildren();
+  trips.forEach(([token, trip]) => {
+    const item = document.createElement("li");
+    item.className = "saved-trip";
+    const details = document.createElement("span");
+    const name = document.createElement("strong");
+    name.className = "saved-trip-name";
+    name.textContent = trip.name || "Untitled trip";
+    details.append(name);
+    if (trip.start) {
+      const date = document.createElement("span");
+      date.className = "saved-trip-date";
+      date.textContent = trip.start;
+      details.append(date);
+    }
+    const load = document.createElement("button");
+    load.type = "button";
+    load.textContent = "Load";
+    load.addEventListener("click", () => loadListedTrip(token, trip));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "saved-trip-delete";
+    remove.textContent = "Delete";
+    remove.addEventListener("click", () => deleteListedTrip(token, trip.name));
+    item.append(details, load, remove);
+    controls.tripList.append(item);
+  });
+}
+
+async function loadTripList() {
+  if (state.listingTrips) {
+    return;
+  }
+
+  state.listingTrips = true;
+  setTripListStatus("Loading trips…");
+  try {
+    const response = await fetch(tripStorageUrl(), {
+      headers: { Accept: "application/json" },
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) {
+      throw new Error("Trip storage is unavailable");
+    }
+    const trips = Object.entries((await response.json()) || {})
+      .filter(
+        ([token, trip]) =>
+          /^[a-f0-9]{32}$/.test(token) && validTripSummary(trip),
+      )
+      .sort(([, first], [, second]) =>
+        (first.start || "").localeCompare(second.start || ""),
+      );
+    renderTripList(trips);
+    setTripListStatus(
+      trips.length === 0
+        ? "No saved trips yet."
+        : `${trips.length} saved trip${trips.length === 1 ? "" : "s"}.`,
+    );
+  } catch {
+    controls.tripList.replaceChildren();
+    setTripListStatus("Trips could not be loaded. Please try again.");
+  } finally {
+    state.listingTrips = false;
   }
 }
 
@@ -1036,6 +1163,11 @@ controls.newTrip.addEventListener("click", () => {
   updateControls();
 });
 
+controls.plannerTab.addEventListener("click", () => selectTab("planner"));
+controls.tripsTab.addEventListener("click", () => {
+  selectTab("trips");
+  loadTripList();
+});
 controls.undo.addEventListener("click", () => {
   invalidateElevationProfile();
   state.anchors.pop();
@@ -1096,4 +1228,5 @@ if (!tripParameters.has("trip") && !tripParameters.has("track")) {
 }
 
 loadTrip();
+loadTripList();
 updateControls();
