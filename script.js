@@ -583,7 +583,7 @@ async function findRoute(start, end) {
         { lat: end.lat, lon: end.lng },
       ],
       costing: "pedestrian",
-      units: "kilometers",
+      units: "miles",
     }),
   );
 
@@ -1067,6 +1067,7 @@ async function loadStopForecast(waypoint, index, signal) {
   );
   const pointData = await fetchNws(pointUrl, signal);
   const forecastUrl = nwsUrl(pointData?.properties?.forecast);
+  forecastUrl.searchParams.set("units", "us");
   const forecast = await fetchNws(forecastUrl, signal);
   const date = stopDate(index);
   const periods = forecast?.properties?.periods;
