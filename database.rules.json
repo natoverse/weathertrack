@@ -1,0 +1,50 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "trips": {
+      "$token": {
+        ".read": "$token.matches(/^[a-f0-9]{32}$/)",
+        ".write": "$token.matches(/^[a-f0-9]{32}$/) && !data.exists()",
+        ".validate": "newData.hasChildren(['name', 'track']) && newData.numChildren() <= 4 && newData.child('track').numChildren() >= 2 && newData.child('track').numChildren() <= 50000 && newData.child('stops').numChildren() <= 1000",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "start": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)"
+        },
+        "track": {
+          "$index": {
+            ".validate": "$index.matches(/^([0-9]{1,4}|[1-4][0-9]{4})$/) && newData.numChildren() == 2",
+            "0": {
+              ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+            },
+            "1": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "stops": {
+          "$index": {
+            ".validate": "$index.matches(/^[0-9]{1,3}$/) && newData.numChildren() == 2",
+            "0": {
+              ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+            },
+            "1": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}
