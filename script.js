@@ -108,7 +108,7 @@ const state = {
 
 const METERS_PER_MILE = 1609.344;
 const FEET_PER_METER = 3.28084;
-const FORECAST_MARKER_SIZE = [132, 50];
+const FORECAST_MARKER_SIZE = [160, 72];
 const FORECAST_MARKER_PADDING = 8;
 
 function localDate() {
@@ -1646,6 +1646,9 @@ function renderForecastMarker(result) {
   const summary = forecastSummary(result.periods);
   const badge = document.createElement("div");
   badge.className = "forecast-map-badge";
+  addText(badge, "div", result.label, "forecast-map-badge-label");
+  const content = document.createElement("div");
+  content.className = "forecast-map-badge-content";
 
   if (typeof summary.icon === "string") {
     try {
@@ -1653,7 +1656,7 @@ function renderForecastMarker(result) {
       const image = document.createElement("img");
       image.src = iconUrl.href;
       image.alt = summary.description;
-      badge.append(image);
+      content.append(image);
     } catch {
       // The numeric summary remains useful if NWS omits a valid icon.
     }
@@ -1679,13 +1682,14 @@ function renderForecastMarker(result) {
       ? "Precip —"
       : `Precip ${summary.precipitation}%`;
   values.append(precipitation);
-  badge.append(values);
+  content.append(values);
+  badge.append(content);
 
   const marker = L.marker(result.location, {
     icon: L.divIcon({
       className: "forecast-map-icon",
       html: badge,
-      iconAnchor: [-10, 25],
+      iconAnchor: [-10, 36],
       iconSize: FORECAST_MARKER_SIZE,
     }),
     interactive: true,
