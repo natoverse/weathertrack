@@ -378,15 +378,16 @@ function renderElevationChart(measurements, stops) {
       distance = Math.max(0, Math.min(measurements.total, nextDistance));
       const elevation = elevationAt(distance);
       const miles = (distance / METERS_PER_MILE).toFixed(1);
+      const label = stopLabel(stop.number - 1);
       stop.waypoint.marker.setLatLng(
         locationAlongTrack(distance, measurements),
       );
       dot.setAttribute("cx", x(distance));
       dot.setAttribute("cy", y(elevation));
-      dot.setAttribute("aria-label", `Stop ${stop.number}`);
+      dot.setAttribute("aria-label", label);
       dot.setAttribute("aria-valuenow", miles);
       dot.setAttribute("aria-valuetext", `${miles} miles`);
-      title.textContent = `Stop ${stop.number}: ${miles} miles, ${Math.round(elevation * FEET_PER_METER)} feet`;
+      title.textContent = `${label}: ${miles} miles, ${Math.round(elevation * FEET_PER_METER)} feet`;
     };
     const commitStopMove = () => {
       clearForecasts();
