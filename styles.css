@@ -159,6 +159,74 @@ button:disabled {
   display: none;
 }
 
+.trip-profile {
+  padding: 0.75rem;
+  margin: 0.75rem 0;
+  background: #f5f8f6;
+  border: 1px solid #c8d2cc;
+  border-radius: 0.35rem;
+}
+
+.trip-mileage {
+  margin: 0.5rem 0 0.15rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.profile-totals,
+.profile-status {
+  margin: 0 0 0.5rem;
+  color: #3f4a45;
+  font-size: 0.8rem;
+}
+
+.elevation-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: #1769aa;
+}
+
+.elevation-chart .profile-area {
+  fill: rgb(23 105 170 / 18%);
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.elevation-chart circle {
+  fill: #e8962e;
+  stroke: #783f00;
+  stroke-width: 2;
+}
+
+.day-summary {
+  overflow-x: auto;
+}
+
+.day-summary table {
+  width: 100%;
+  font-size: 0.8rem;
+  border-collapse: collapse;
+}
+
+.day-summary caption {
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.day-summary th,
+.day-summary td {
+  padding: 0.25rem;
+  text-align: right;
+  border-bottom: 1px solid #d7ddd9;
+}
+
+.day-summary th:first-child,
+.day-summary td:first-child {
+  text-align: left;
+}
+
 .forecast-panel {
   padding-top: 0.75rem;
   margin: 0.75rem 0;
