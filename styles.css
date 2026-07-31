@@ -73,6 +73,45 @@ h1 {
   display: block;
 }
 
+.forecast-map-icon {
+  background: none;
+  border: 0;
+}
+
+.forecast-map-badge {
+  display: flex;
+  width: 132px;
+  height: 50px;
+  overflow: hidden;
+  color: #17221d;
+  background: rgb(255 255 255 / 94%);
+  border: 1px solid #52655c;
+  border-radius: 0.4rem;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+}
+
+.forecast-map-badge img {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+}
+
+.forecast-map-badge div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.7rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.forecast-map-badge strong {
+  font-size: 0.72rem;
+}
+
 .trip-tools {
   position: absolute;
   z-index: 1000;
