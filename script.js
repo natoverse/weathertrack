@@ -97,6 +97,7 @@ const state = {
   forecastRequest: 0,
   forecastController: null,
   saving: false,
+  savedTripToken: null,
   importing: false,
   listingTrips: false,
   profileRequest: 0,
@@ -743,6 +744,7 @@ function clearTrip() {
   state.waypoints.forEach(({ marker }) => marker.remove());
   state.waypoints = [];
   state.tripStarted = false;
+  state.savedTripToken = null;
   clearForecasts();
   controls.name.value = "";
   controls.date.value = localDate();
@@ -1195,7 +1197,7 @@ function tripToken() {
 }
 
 async function saveTrip() {
-  const token = tripToken();
+  const token = state.savedTripToken || tripToken();
   let storageUrl;
   try {
     storageUrl = tripStorageUrl(token);
@@ -1219,6 +1221,7 @@ async function saveTrip() {
       throw new Error("Trip storage is unavailable");
     }
 
+    state.savedTripToken = token;
     const url = new URL(window.location.href);
     url.search = "";
     url.searchParams.set("trip", token);
@@ -1244,6 +1247,7 @@ function validTripSummary(trip) {
 function loadListedTrip(token, trip) {
   clearTrip();
   loadSavedTrip(trip);
+  state.savedTripToken = token;
   const url = new URL(window.location.href);
   url.search = "";
   url.searchParams.set("trip", token);
@@ -1413,6 +1417,7 @@ async function loadTrip() {
       throw new Error("Trip storage is unavailable");
     }
     loadSavedTrip(await response.json());
+    state.savedTripToken = token;
   } catch {
     setStatus("This shared trip URL could not be loaded.");
   }

@@ -6,7 +6,7 @@
       ".read": true,
       "$token": {
         ".read": "$token.matches(/^[a-f0-9]{32}$/)",
-        ".write": "$token.matches(/^[a-f0-9]{32}$/) && (!data.exists() || !newData.exists())",
+        ".write": "$token.matches(/^[a-f0-9]{32}$/)",
         ".validate": "newData.hasChildren(['name', 'track']) && newData.child('track').hasChildren(['0', '1'])",
         "name": {
           ".validate": "newData.isString() && newData.val().length <= 100"
