@@ -6,7 +6,7 @@ const streetLayer = L.tileLayer(
     maxNativeZoom: 19,
     maxZoom: 40,
     attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
   },
 );
 
@@ -26,7 +26,7 @@ const topographicLayer = L.tileLayer(
     maxNativeZoom: 17,
     maxZoom: 40,
     attribution:
-      'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+      'Map data: &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org" target="_blank" rel="noopener noreferrer">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener noreferrer">CC-BY-SA</a>)',
   },
 ).addTo(map);
 
@@ -1538,6 +1538,8 @@ function renderForecast(result) {
     "forecast-detail",
   );
   pageLink.href = result.pageUrl;
+  pageLink.target = "_blank";
+  pageLink.rel = "noopener noreferrer";
 
   if (result.error) {
     addText(card, "p", result.error, "forecast-detail");
