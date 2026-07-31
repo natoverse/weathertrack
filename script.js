@@ -707,5 +707,10 @@ map.on("click", ({ latlng }) => {
   }
 });
 
+const tripParameters = new URLSearchParams(window.location.search);
+if (!tripParameters.has("trip") && !tripParameters.has("track")) {
+  map.locate({ setView: true, maxZoom: 13 });
+}
+
 loadTrip();
 updateControls();
