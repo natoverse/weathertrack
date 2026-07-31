@@ -180,6 +180,7 @@ function updateControls() {
     !validDate(controls.date.value) ||
     state.routing ||
     state.importing ||
+    state.profileLoading ||
     state.forecasting;
 }
 
@@ -711,6 +712,7 @@ async function loadElevationProfile() {
   state.profileLoading = true;
   state.elevationProfile = [];
   renderTripProfile();
+  updateControls();
   const timeout = window.setTimeout(() => controller.abort(), 12000);
 
   try {
@@ -731,6 +733,7 @@ async function loadElevationProfile() {
       state.profileLoading = false;
       state.profileController = null;
       renderTripProfile();
+      updateControls();
     }
   }
 }
@@ -1340,7 +1343,7 @@ async function loadTripList() {
   }
 }
 
-function loadSavedTrip(trip) {
+async function loadSavedTrip(trip) {
   const stops = trip?.stops ?? [];
   if (
     typeof trip?.name !== "string" ||
@@ -1372,7 +1375,7 @@ function loadSavedTrip(trip) {
   setStatus("Shared trip loaded.");
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
   updateControls();
-  loadElevationProfile();
+  await loadElevationProfile();
   if (stops.length > 0 && validDate(controls.date.value)) {
     updateForecasts();
   }
@@ -1387,7 +1390,7 @@ function loadLegacyTrip(parameters) {
   if (parameters.has("start")) {
     trip.start = parameters.get("start");
   }
-  loadSavedTrip(trip);
+  return loadSavedTrip(trip);
 }
 
 async function loadTrip() {
@@ -1399,7 +1402,7 @@ async function loadTrip() {
 
   try {
     if (!token) {
-      loadLegacyTrip(parameters);
+      await loadLegacyTrip(parameters);
       return;
     }
     if (!/^[a-f0-9]{32}$/.test(token)) {
@@ -1414,7 +1417,7 @@ async function loadTrip() {
     if (!response.ok) {
       throw new Error("Trip storage is unavailable");
     }
-    loadSavedTrip(await response.json());
+    await loadSavedTrip(await response.json());
     state.savedTripToken = token;
   } catch {
     setStatus("This shared trip URL could not be loaded.");
@@ -1496,6 +1499,31 @@ function midpointForecastLocation(
   return availableLocation || locationAlongTrack(midpoint, measurements);
 }
 
+function highPointForecastTarget(measurements, locations) {
+  if (state.elevationProfile.length === 0) {
+    return null;
+  }
+  const highPoint = state.elevationProfile.reduce((highest, point) =>
+    point.elevation > highest.elevation ? point : highest,
+  );
+  const stopDistances = locations.map((location) =>
+    distanceAlongTrack(location, measurements),
+  );
+  const nextStopIndex = stopDistances.findIndex(
+    (distance) => distance >= highPoint.distance,
+  );
+  const dayIndex =
+    nextStopIndex === -1 ? stopDistances.length : nextStopIndex;
+
+  return {
+    badgeLabel: `${stopDay(dayIndex)} high point`,
+    date: stopDate(dayIndex),
+    daytimeOnly: true,
+    label: `High point - ${stopDay(dayIndex)}`,
+    location: locationAlongTrack(highPoint.distance, measurements),
+  };
+}
+
 function forecastTargets() {
   const measurements = trackMeasurements();
   const locations = state.waypoints.map(({ marker }) => marker.getLatLng());
@@ -1536,6 +1564,11 @@ function forecastTargets() {
       });
     }
   });
+
+  const highPointTarget = highPointForecastTarget(measurements, locations);
+  if (highPointTarget) {
+    targets.push(highPointTarget);
+  }
 
   const lastLocation = locations.at(-1);
   if (lastLocation) {
@@ -1639,9 +1672,7 @@ function renderForecastMarker(result) {
     result.error ||
     result.periods.length === 0 ||
     !result.location ||
-    (!result.label.startsWith("Stop ") &&
-      !result.label.startsWith("Between stops ") &&
-      !result.label.startsWith("Day after Stop "))
+    !result.badgeLabel
   ) {
     return;
   }

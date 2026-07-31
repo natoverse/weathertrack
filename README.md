@@ -12,9 +12,9 @@ every day of a trip before you head out.
 - **Import and export GPX tracks.** Bring an existing GPX track into the trip
   planner or download the current trip track as a GPX file.
 - **Per-day weather forecasts.** For each day, WeatherTrack retrieves forecasts
-  at the planned stop and halfway along the track between stops. It also shows
-  the weather for the day before the first stop and the day after the final
-  stop.
+  at the planned stop, halfway along the track between stops, and at the trip's
+  high point. It also shows the weather for the day before the first stop and
+  the day after the final stop.
 - **Trip-wide weather overview.** See the forecast across the full duration of
   the trip so you can understand weather expectations from start to finish.
 
