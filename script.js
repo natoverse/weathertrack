@@ -77,7 +77,7 @@ const controls = {
 
 const track = L.polyline([], {
   color: "#075985",
-  weight: 7,
+  weight: 3.5,
   opacity: 1,
   className: "trip-track",
 }).addTo(map);
