@@ -1519,6 +1519,7 @@ function forecastTargets() {
 
   locations.forEach((location, index) => {
     targets.push({
+      badgeLabel: stopLabel(index),
       date: stopDate(index),
       label: stopLabel(index),
       location,
@@ -1529,6 +1530,7 @@ function forecastTargets() {
       const startDistance = distanceAlongTrack(location, measurements);
       const endDistance = distanceAlongTrack(nextLocation, measurements);
       targets.push({
+        badgeLabel: `${stopDay(index + 1)} midpoint`,
         date: stopDate(index + 1),
         daytimeOnly: true,
         label: `Between stops ${index + 1} and ${index + 2} - ${stopDay(index + 1)}`,
@@ -1545,6 +1547,7 @@ function forecastTargets() {
   const lastLocation = locations.at(-1);
   if (lastLocation) {
     targets.push({
+      badgeLabel: `${stopDay(locations.length)} after Stop ${locations.length}`,
       date: stopDate(locations.length),
       label: `Day after Stop ${locations.length}`,
       location: lastLocation,
@@ -1554,7 +1557,7 @@ function forecastTargets() {
 }
 
 async function loadForecast(target, signal) {
-  const { date, daytimeOnly, label, location } = target;
+  const { badgeLabel, date, daytimeOnly, label, location } = target;
   const pointUrl = new URL(
     `https://api.weather.gov/points/${location.lat.toFixed(4)},${location.lng.toFixed(4)}`,
   );
@@ -1569,6 +1572,7 @@ async function loadForecast(target, signal) {
   }
 
   return {
+    badgeLabel,
     date,
     label,
     location,
@@ -1646,7 +1650,12 @@ function renderForecastMarker(result) {
   const summary = forecastSummary(result.periods);
   const badge = document.createElement("div");
   badge.className = "forecast-map-badge";
-  addText(badge, "div", result.label, "forecast-map-badge-label");
+  addText(
+    badge,
+    "div",
+    result.badgeLabel || result.label,
+    "forecast-map-badge-label",
+  );
   const content = document.createElement("div");
   content.className = "forecast-map-badge-content";
 
