@@ -736,8 +736,7 @@ function childElements(parent, name) {
 
 function parseGpx(value) {
   // This detached XML document is never rendered; only validated data is read.
-  // lgtm[js/xss-through-dom]
-  const document = new DOMParser().parseFromString(value, "application/xml");
+  const document = new DOMParser().parseFromString(value, "application/xml"); // lgtm[js/xss-through-dom]
   const root = document.documentElement;
   if (root.localName !== "gpx" || document.querySelector("parsererror")) {
     throw new Error("Invalid GPX");
