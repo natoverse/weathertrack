@@ -921,14 +921,15 @@ function closestPointOnTrack(point) {
 
 function renderWaypoint(location) {
   const stopNumber = state.waypoints.length + 1;
+  const label = stopLabel(stopNumber - 1);
   const marker = L.marker(location)
-    .bindTooltip(`Stop ${stopNumber}`, {
+    .bindTooltip(label, {
       permanent: true,
       direction: "top",
     })
     .addTo(map);
   const item = document.createElement("li");
-  item.textContent = `Stop ${stopNumber}`;
+  item.textContent = label;
   controls.waypointList.append(item);
   state.waypoints.push({ marker, item });
   clearForecasts();
@@ -1114,6 +1115,26 @@ function stopDate(index) {
   const date = new Date(`${controls.date.value}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + index);
   return date.toISOString().slice(0, 10);
+}
+
+function stopLabel(index) {
+  const number = index + 1;
+  if (!validDate(controls.date.value)) {
+    return `Stop ${number}`;
+  }
+  const day = new Date(`${stopDate(index)}T00:00:00Z`).toLocaleDateString(
+    undefined,
+    { timeZone: "UTC", weekday: "long" },
+  );
+  return `Stop ${number} - ${day}`;
+}
+
+function updateWaypointLabels() {
+  state.waypoints.forEach(({ marker, item }, index) => {
+    const label = stopLabel(index);
+    marker.setTooltipContent(label);
+    item.textContent = label;
+  });
 }
 
 function clearForecasts() {
@@ -1349,6 +1370,9 @@ function loadSavedTrip(trip) {
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
   updateControls();
   loadElevationProfile();
+  if (stops.length > 0 && validDate(controls.date.value)) {
+    updateForecasts();
+  }
 }
 
 function loadLegacyTrip(parameters) {
@@ -1449,7 +1473,7 @@ function forecastTargets() {
   locations.forEach((location, index) => {
     targets.push({
       date: stopDate(index),
-      label: `Stop ${index + 1}`,
+      label: stopLabel(index),
       location,
     });
 
@@ -1564,7 +1588,8 @@ function renderForecastMarker(result) {
     result.periods.length === 0 ||
     !result.location ||
     (!result.label.startsWith("Stop ") &&
-      !result.label.startsWith("Between stops "))
+      !result.label.startsWith("Between stops ") &&
+      !result.label.startsWith("Day after Stop "))
   ) {
     return;
   }
@@ -1777,6 +1802,8 @@ controls.gpxFile.addEventListener("change", importGpx);
 controls.downloadGpx.addEventListener("click", downloadGpx);
 controls.updateForecast.addEventListener("click", updateForecasts);
 controls.date.addEventListener("change", () => {
+  updateWaypointLabels();
+  renderTripProfile();
   clearForecasts();
   updateControls();
 });
