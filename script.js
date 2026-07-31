@@ -1417,9 +1417,11 @@ async function loadTrip() {
     if (!response.ok) {
       throw new Error("Trip storage is unavailable");
     }
-    await loadSavedTrip(await response.json());
+    const loadingTrip = loadSavedTrip(await response.json());
     state.savedTripToken = token;
+    await loadingTrip;
   } catch {
+    state.savedTripToken = null;
     setStatus("This shared trip URL could not be loaded.");
   }
 }
