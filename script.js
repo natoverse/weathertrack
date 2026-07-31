@@ -447,6 +447,7 @@ function loadSavedTrip(trip) {
   renderTrack();
   setStatus("Shared trip loaded.");
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
+  updateControls();
 }
 
 function loadLegacyTrip(parameters) {
