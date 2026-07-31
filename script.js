@@ -734,9 +734,7 @@ function childElements(parent, name) {
   );
 }
 
-function parseGpx(value) {
-  // This detached XML document is never rendered; only validated data is read.
-  const document = new DOMParser().parseFromString(value, "application/xml"); // lgtm[js/xss-through-dom]
+function parseGpx(document) {
   const root = document.documentElement;
   if (root.localName !== "gpx" || document.querySelector("parsererror")) {
     throw new Error("Invalid GPX");
@@ -775,6 +773,27 @@ function parseGpx(value) {
   };
 }
 
+function readGpx(file) {
+  const url = URL.createObjectURL(file);
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    const finish = (document) => {
+      URL.revokeObjectURL(url);
+      if (document) {
+        resolve(document);
+      } else {
+        reject(new Error("Invalid GPX"));
+      }
+    };
+    request.addEventListener("load", () => finish(request.responseXML));
+    request.addEventListener("error", () => finish());
+    request.open("GET", url);
+    request.responseType = "document";
+    request.overrideMimeType("application/xml");
+    request.send();
+  });
+}
+
 async function importGpx() {
   const [file] = controls.gpxFile.files;
   if (!file) {
@@ -785,7 +804,7 @@ async function importGpx() {
   setStatus("Importing GPX track…");
   updateControls();
   try {
-    const trip = parseGpx(await file.text());
+    const trip = parseGpx(await readGpx(file));
     clearTrip();
     loadSavedTrip(trip);
     setStatus("GPX track imported.");
