@@ -21,12 +21,12 @@ const satelliteLayer = L.tileLayer(
 );
 
 const topographicLayer = L.tileLayer(
-  "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
   {
-    maxNativeZoom: 17,
+    maxNativeZoom: 16,
     maxZoom: 40,
     attribution:
-      'Map data: &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org" target="_blank" rel="noopener noreferrer">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener noreferrer">CC-BY-SA</a>)',
+      'Tiles courtesy of the <a href="https://www.usgs.gov/" target="_blank" rel="noopener noreferrer">U.S. Geological Survey</a>',
   },
 ).addTo(map);
 
