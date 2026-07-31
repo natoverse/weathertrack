@@ -15,6 +15,9 @@ body {
 }
 
 header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.75rem 1.25rem;
   color: #fff;
   background: #1f4f3b;
@@ -23,6 +26,16 @@ header {
 h1 {
   margin: 0;
   font-size: 1.5rem;
+}
+
+.github-link {
+  display: flex;
+  color: inherit;
+}
+
+.github-link svg {
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .app-shell {
