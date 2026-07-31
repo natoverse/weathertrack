@@ -6,7 +6,7 @@
       "$token": {
         ".read": "$token.matches(/^[a-f0-9]{32}$/)",
         ".write": "$token.matches(/^[a-f0-9]{32}$/) && !data.exists()",
-        ".validate": "newData.hasChildren(['name', 'track']) && newData.numChildren() <= 4 && newData.child('track').numChildren() >= 2 && newData.child('track').numChildren() <= 50000 && newData.child('stops').numChildren() <= 1000",
+        ".validate": "newData.hasChildren(['name', 'track']) && newData.child('track').hasChildren(['0', '1'])",
         "name": {
           ".validate": "newData.isString() && newData.val().length <= 100"
         },
@@ -15,7 +15,7 @@
         },
         "track": {
           "$index": {
-            ".validate": "$index.matches(/^([0-9]{1,4}|[1-4][0-9]{4})$/) && newData.numChildren() == 2",
+            ".validate": "$index.matches(/^(0|[1-9][0-9]{0,3}|[1-4][0-9]{4})$/) && newData.hasChildren(['0', '1'])",
             "0": {
               ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
             },
@@ -29,7 +29,7 @@
         },
         "stops": {
           "$index": {
-            ".validate": "$index.matches(/^[0-9]{1,3}$/) && newData.numChildren() == 2",
+            ".validate": "$index.matches(/^(0|[1-9][0-9]{0,2})$/) && newData.hasChildren(['0', '1'])",
             "0": {
               ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
             },
