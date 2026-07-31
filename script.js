@@ -1683,6 +1683,12 @@ function forecastSummary(periods) {
       daytime[0]?.temperatureUnit || nighttime[0]?.temperatureUnit,
     icon: iconPeriod?.icon,
     description: iconPeriod?.shortForecast || "Weather forecast",
+    windDirection:
+      typeof iconPeriod?.windDirection === "string"
+        ? iconPeriod.windDirection
+        : null,
+    windSpeed:
+      typeof iconPeriod?.windSpeed === "string" ? iconPeriod.windSpeed : null,
   };
 }
 
@@ -1740,6 +1746,13 @@ function renderForecastMarker(result) {
       ? "Precip —"
       : `Precip ${summary.precipitation}%`;
   values.append(precipitation);
+
+  const wind = document.createElement("span");
+  const windEstimate = [summary.windDirection, summary.windSpeed]
+    .filter(Boolean)
+    .join(" ");
+  wind.textContent = windEstimate ? `Wind ${windEstimate}` : "Wind —";
+  values.append(wind);
   content.append(values);
   badge.append(content);
 
