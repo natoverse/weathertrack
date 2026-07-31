@@ -9,6 +9,8 @@ every day of a trip before you head out.
 
 - **Draw multi-day tracks on a map.** Plot the route for a trip and break it
   into daily segments, each with a planned stop point.
+- **Import and export GPX tracks.** Bring an existing GPX track into the trip
+  planner or download the current trip track as a GPX file.
 - **Per-day weather forecasts.** For each day, WeatherTrack uses the
   coordinates of that day's planned stop point to retrieve a weather forecast.
 - **Trip-wide weather overview.** See the forecast across the full duration of

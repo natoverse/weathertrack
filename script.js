@@ -19,6 +19,9 @@ const controls = {
   finish: document.querySelector("#finish-track"),
   addWaypoint: document.querySelector("#add-waypoint"),
   save: document.querySelector("#save-trip"),
+  importGpx: document.querySelector("#import-gpx"),
+  downloadGpx: document.querySelector("#download-gpx"),
+  gpxFile: document.querySelector("#gpx-file"),
   clear: document.querySelector("#clear-trip"),
   snap: document.querySelector("#snap-to-routes"),
   status: document.querySelector("#trip-status"),
@@ -56,6 +59,7 @@ const state = {
   forecastRequest: 0,
   forecastController: null,
   saving: false,
+  importing: false,
   listingTrips: false,
   profileRequest: 0,
   profileController: null,
@@ -97,25 +101,44 @@ function updateControls() {
   controls.tripDetails.hidden = !state.tripStarted;
   map
     .getContainer()
-    .classList.toggle("map-editing", state.recording || state.placingWaypoint);
-  controls.undo.disabled = !state.recording || !hasTrack || state.routing;
+    .classList.toggle(
+      "map-editing",
+      !state.importing && (state.recording || state.placingWaypoint),
+    );
+  controls.undo.disabled =
+    !state.recording || !hasTrack || state.routing || state.importing;
   controls.finish.disabled =
-    !state.recording || state.anchors.length < 2 || state.routing;
+    !state.recording ||
+    state.anchors.length < 2 ||
+    state.routing ||
+    state.importing;
   controls.addWaypoint.disabled =
-    state.recording || state.anchors.length < 2 || state.routing;
+    state.recording ||
+    state.anchors.length < 2 ||
+    state.routing ||
+    state.importing;
   controls.addWaypoint.textContent = state.placingWaypoint
     ? "Cancel stop"
     : "Add stop";
   controls.clear.disabled =
-    !hasTrack && state.waypoints.length === 0 && !state.routing;
+    (!hasTrack && state.waypoints.length === 0 && !state.routing) ||
+    state.importing;
   controls.save.disabled =
-    state.anchors.length < 2 || state.routing || state.saving;
-  controls.newTrip.disabled = state.routing;
-  controls.snap.disabled = state.routing;
+    state.anchors.length < 2 ||
+    state.routing ||
+    state.saving ||
+    state.importing;
+  controls.importGpx.disabled =
+    state.routing || state.saving || state.importing;
+  controls.downloadGpx.disabled =
+    state.anchors.length < 2 || state.routing || state.importing;
+  controls.newTrip.disabled = state.routing || state.importing;
+  controls.snap.disabled = state.routing || state.importing;
   controls.updateForecast.disabled =
     state.waypoints.length === 0 ||
     !validDate(controls.date.value) ||
     state.routing ||
+    state.importing ||
     state.forecasting;
 }
 
@@ -705,6 +728,134 @@ function coordinates(point) {
   ];
 }
 
+function childElements(parent, name) {
+  return Array.from(parent.children).filter(
+    (element) => element.localName === name,
+  );
+}
+
+function parseGpx(value) {
+  const document = new DOMParser().parseFromString(value, "application/xml");
+  const root = document.documentElement;
+  if (root.localName !== "gpx" || document.querySelector("parsererror")) {
+    throw new Error("Invalid GPX");
+  }
+
+  const tracks = childElements(root, "trk");
+  const points = tracks.flatMap((gpxTrack) =>
+    childElements(gpxTrack, "trkseg").flatMap((segment) =>
+      childElements(segment, "trkpt").map((point) => {
+        const latitude = point.getAttribute("lat");
+        const longitude = point.getAttribute("lon");
+        return [
+          latitude === null || latitude.trim() === "" ? NaN : Number(latitude),
+          longitude === null || longitude.trim() === ""
+            ? NaN
+            : Number(longitude),
+        ];
+      }),
+    ),
+  );
+  if (
+    points.length < 2 ||
+    points.length > 50000 ||
+    !points.every(validCoordinates)
+  ) {
+    throw new Error("Invalid GPX track");
+  }
+
+  const nameElement = tracks
+    .flatMap((gpxTrack) => childElements(gpxTrack, "name"))
+    .find((element) => element.textContent.trim());
+  return {
+    name: (nameElement?.textContent.trim() || "").slice(0, 100),
+    track: points,
+    stops: [],
+  };
+}
+
+async function importGpx() {
+  const [file] = controls.gpxFile.files;
+  if (!file) {
+    return;
+  }
+
+  state.importing = true;
+  setStatus("Importing GPX track…");
+  updateControls();
+  try {
+    const trip = parseGpx(await file.text());
+    clearTrip();
+    loadSavedTrip(trip);
+    setStatus("GPX track imported.");
+  } catch {
+    setStatus("This GPX file does not contain a valid track.");
+  } finally {
+    state.importing = false;
+    controls.gpxFile.value = "";
+    updateControls();
+  }
+}
+
+function escapeXml(value) {
+  return value
+    .replace(
+      /[^\u0009\u000a\u000d\u0020-\ud7ff\ue000-\ufffd\u{10000}-\u{10ffff}]/gu,
+      "",
+    )
+    .replace(
+      /[&<>"']/g,
+      (character) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&apos;",
+        })[character],
+    );
+}
+
+function gpxData() {
+  const name = controls.name.value.trim();
+  const metadata = [
+    name ? `<name>${escapeXml(name)}</name>` : "",
+    validDate(controls.date.value)
+      ? `<time>${controls.date.value}T00:00:00Z</time>`
+      : "",
+  ].join("");
+  const points = trackPoints()
+    .map(({ lat, lng }) => `<trkpt lat="${lat}" lon="${lng}"></trkpt>`)
+    .join("");
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<gpx version="1.1" creator="WeatherTrack" xmlns="http://www.topografix.com/GPX/1/1">',
+    metadata ? `<metadata>${metadata}</metadata>` : "",
+    `<trk>${name ? `<name>${escapeXml(name)}</name>` : ""}<trkseg>${points}</trkseg></trk>`,
+    "</gpx>",
+  ].join("");
+}
+
+function downloadGpx() {
+  const filename =
+    controls.name.value
+      .trim()
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 80) || "weathertrack-trip";
+  const url = URL.createObjectURL(
+    new Blob([gpxData()], { type: "application/gpx+xml" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}.gpx`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url));
+  setStatus("GPX track downloaded.");
+}
+
 function validDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
@@ -1208,6 +1359,9 @@ controls.clear.addEventListener("click", () => {
 });
 
 controls.save.addEventListener("click", saveTrip);
+controls.importGpx.addEventListener("click", () => controls.gpxFile.click());
+controls.gpxFile.addEventListener("change", importGpx);
+controls.downloadGpx.addEventListener("click", downloadGpx);
 controls.updateForecast.addEventListener("click", updateForecasts);
 controls.date.addEventListener("change", () => {
   clearForecasts();
@@ -1215,6 +1369,9 @@ controls.date.addEventListener("change", () => {
 });
 
 map.on("click", ({ latlng }) => {
+  if (state.importing) {
+    return;
+  }
   if (state.recording) {
     addTrackPoint(latlng);
   } else if (state.placingWaypoint) {

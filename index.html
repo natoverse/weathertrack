@@ -62,7 +62,17 @@
             </button>
             <button id="add-waypoint" type="button" disabled>Add stop</button>
             <button id="save-trip" type="button" disabled>Save</button>
+            <button id="import-gpx" type="button">Import GPX</button>
+            <button id="download-gpx" type="button" disabled>
+              Download GPX
+            </button>
             <button id="clear-trip" type="button" disabled>Clear</button>
+            <input
+              id="gpx-file"
+              type="file"
+              accept=".gpx,application/gpx+xml,application/xml,text/xml"
+              hidden
+            />
           </div>
           <label class="snap-option">
             <input id="snap-to-routes" type="checkbox" checked />
