@@ -100,6 +100,7 @@ const state = {
   savedTripToken: null,
   importing: false,
   listingTrips: false,
+  tripLoadRequest: 0,
   profileRequest: 0,
   profileController: null,
   elevationProfile: [],
@@ -739,6 +740,7 @@ async function loadElevationProfile() {
 }
 
 function clearTrip() {
+  state.tripLoadRequest += 1;
   state.routeRequest += 1;
   invalidateElevationProfile();
   state.anchors = [];
@@ -1247,16 +1249,23 @@ function validTripSummary(trip) {
 
 async function loadListedTrip(token, trip) {
   clearTrip();
+  const request = state.tripLoadRequest;
   const loadingTrip = loadSavedTrip(trip);
   state.savedTripToken = token;
   try {
     await loadingTrip;
+    if (request !== state.tripLoadRequest) {
+      return;
+    }
     const url = new URL(window.location.href);
     url.search = "";
     url.searchParams.set("trip", token);
     window.history.replaceState(null, "", url);
     selectTab("planner");
   } catch {
+    if (request !== state.tripLoadRequest) {
+      return;
+    }
     state.savedTripToken = null;
     setStatus("This trip could not be loaded.");
   }
@@ -1527,6 +1536,7 @@ function highPointForecastTarget(measurements, locations) {
     badgeLabel: `${stopDay(dayIndex)} high point`,
     date: stopDate(dayIndex),
     daytimeOnly: true,
+    iconAnchor: [FORECAST_MARKER_SIZE[0] + 10, 36],
     label: `High point - ${stopDay(dayIndex)}`,
     location: locationAlongTrack(highPoint.distance, measurements),
   };
@@ -1597,7 +1607,7 @@ function forecastTargets() {
 }
 
 async function loadForecast(target, signal) {
-  const { badgeLabel, date, daytimeOnly, label, location } = target;
+  const { badgeLabel, date, daytimeOnly, iconAnchor, label, location } = target;
   const pointUrl = new URL(
     `https://api.weather.gov/points/${location.lat.toFixed(4)},${location.lng.toFixed(4)}`,
   );
@@ -1614,6 +1624,7 @@ async function loadForecast(target, signal) {
   return {
     badgeLabel,
     date,
+    iconAnchor,
     label,
     location,
     pageUrl: nwsPageUrl(location),
@@ -1736,7 +1747,7 @@ function renderForecastMarker(result) {
     icon: L.divIcon({
       className: "forecast-map-icon",
       html: badge,
-      iconAnchor: [-10, 36],
+      iconAnchor: result.iconAnchor || [-10, 36],
       iconSize: FORECAST_MARKER_SIZE,
     }),
     interactive: true,
