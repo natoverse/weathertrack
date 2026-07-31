@@ -411,12 +411,20 @@ function renderTrackDirections(points) {
     return;
   }
 
-  const projected = points.map((point) => map.latLngToLayerPoint(point));
+  const projected = points.map((point) => map.latLngToContainerPoint(point));
+  const viewport = L.bounds(L.point(0, 0), map.getSize());
   const segments = [];
   let totalLength = 0;
   for (let index = 1; index < projected.length; index += 1) {
-    const start = projected[index - 1];
-    const end = projected[index];
+    const clipped = L.LineUtil.clipSegment(
+      projected[index - 1],
+      projected[index],
+      viewport,
+    );
+    if (!clipped) {
+      continue;
+    }
+    const [start, end] = clipped;
     const length = start.distanceTo(end);
     if (length > 0) {
       segments.push({ start, end, length, offset: totalLength });
@@ -446,7 +454,7 @@ function renderTrackDirections(points) {
       segment.end.y - segment.start.y,
       segment.end.x - segment.start.x,
     )}rad)`;
-    L.marker(map.layerPointToLatLng(position), {
+    L.marker(map.containerPointToLatLng(position), {
       icon: L.divIcon({
         className: "track-direction-icon",
         html: arrow,
@@ -466,7 +474,7 @@ function renderTrack() {
   renderTripProfile();
 }
 
-map.on("zoomend resize", () => renderTrackDirections(trackPoints()));
+map.on("moveend resize", () => renderTrackDirections(trackPoints()));
 
 function invalidateElevationProfile() {
   state.profileRequest += 1;
