@@ -1245,15 +1245,21 @@ function validTripSummary(trip) {
   );
 }
 
-function loadListedTrip(token, trip) {
+async function loadListedTrip(token, trip) {
   clearTrip();
-  loadSavedTrip(trip);
+  const loadingTrip = loadSavedTrip(trip);
   state.savedTripToken = token;
-  const url = new URL(window.location.href);
-  url.search = "";
-  url.searchParams.set("trip", token);
-  window.history.replaceState(null, "", url);
-  selectTab("planner");
+  try {
+    await loadingTrip;
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("trip", token);
+    window.history.replaceState(null, "", url);
+    selectTab("planner");
+  } catch {
+    state.savedTripToken = null;
+    setStatus("This trip could not be loaded.");
+  }
 }
 
 async function deleteListedTrip(token, name) {
@@ -1510,7 +1516,7 @@ function highPointForecastTarget(measurements, locations) {
   );
   const stopDistances = locations.map((location) =>
     distanceAlongTrack(location, measurements),
-  );
+  ).sort((first, second) => first - second);
   const nextStopIndex = stopDistances.findIndex(
     (distance) => distance >= highPoint.distance,
   );
