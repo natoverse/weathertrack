@@ -1360,8 +1360,56 @@ function nwsPageUrl(location) {
   return url.href;
 }
 
-async function loadStopForecast(waypoint, index, signal) {
-  const location = waypoint.marker.getLatLng();
+function forecastTargets() {
+  const measurements = trackMeasurements();
+  const locations = state.waypoints.map(({ marker }) => marker.getLatLng());
+  const targets = [];
+  const firstLocation = locations[0];
+
+  if (firstLocation) {
+    targets.push({
+      date: stopDate(-1),
+      label: "Day before Stop 1",
+      location: firstLocation,
+    });
+  }
+
+  locations.forEach((location, index) => {
+    targets.push({
+      date: stopDate(index),
+      label: `Stop ${index + 1}`,
+      location,
+    });
+
+    const nextLocation = locations[index + 1];
+    if (nextLocation) {
+      const startDistance = distanceAlongTrack(location, measurements);
+      const endDistance = distanceAlongTrack(nextLocation, measurements);
+      targets.push({
+        date: stopDate(index + 1),
+        daytimeOnly: true,
+        label: `Between stops ${index + 1} and ${index + 2}`,
+        location: locationAlongTrack(
+          (startDistance + endDistance) / 2,
+          measurements,
+        ),
+      });
+    }
+  });
+
+  const lastLocation = locations.at(-1);
+  if (lastLocation) {
+    targets.push({
+      date: stopDate(locations.length),
+      label: `Day after Stop ${locations.length}`,
+      location: lastLocation,
+    });
+  }
+  return targets;
+}
+
+async function loadForecast(target, signal) {
+  const { date, daytimeOnly, label, location } = target;
   const pointUrl = new URL(
     `https://api.weather.gov/points/${location.lat.toFixed(4)},${location.lng.toFixed(4)}`,
   );
@@ -1369,7 +1417,6 @@ async function loadStopForecast(waypoint, index, signal) {
   const forecastUrl = nwsUrl(pointData?.properties?.forecast);
   forecastUrl.searchParams.set("units", "us");
   const forecast = await fetchNws(forecastUrl, signal);
-  const date = stopDate(index);
   const periods = forecast?.properties?.periods;
 
   if (!Array.isArray(periods)) {
@@ -1378,6 +1425,7 @@ async function loadStopForecast(waypoint, index, signal) {
 
   return {
     date,
+    label,
     pageUrl: nwsPageUrl(location),
     place: [
       pointData?.properties?.relativeLocation?.properties?.city,
@@ -1388,7 +1436,8 @@ async function loadStopForecast(waypoint, index, signal) {
     periods: periods.filter(
       (period) =>
         typeof period?.startTime === "string" &&
-        period.startTime.slice(0, 10) === date,
+        period.startTime.slice(0, 10) === date &&
+        (!daytimeOnly || period.isDaytime === true),
     ),
   };
 }
@@ -1403,10 +1452,10 @@ function addText(parent, elementName, text, className) {
   return element;
 }
 
-function renderForecast(result, index) {
+function renderForecast(result) {
   const card = document.createElement("article");
   card.className = "forecast-card";
-  addText(card, "h3", `Stop ${index + 1} — ${result.date}`);
+  addText(card, "h3", `${result.label} — ${result.date}`);
 
   if (result.place) {
     addText(card, "p", result.place);
@@ -1467,15 +1516,17 @@ async function updateForecasts() {
   updateControls();
 
   const timeout = window.setTimeout(() => controller.abort(), 15000);
+  const targets = forecastTargets();
   const results = await Promise.all(
-    state.waypoints.map((waypoint, index) =>
-      loadStopForecast(waypoint, index, controller.signal).catch((error) => ({
-        date: stopDate(index),
+    targets.map((target) =>
+      loadForecast(target, controller.signal).catch((error) => ({
+        date: target.date,
         error:
           error.name === "AbortError"
             ? "The NWS request timed out."
-            : "The NWS forecast could not be loaded for this stop.",
-        pageUrl: nwsPageUrl(waypoint.marker.getLatLng()),
+            : "The NWS forecast could not be loaded for this location.",
+        label: target.label,
+        pageUrl: nwsPageUrl(target.location),
         periods: [],
       })),
     ),
