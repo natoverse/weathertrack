@@ -1,9 +1,10 @@
-const map = L.map("map").setView([39.5, -98.35], 4);
+const map = L.map("map", { maxZoom: 40 }).setView([39.5, -98.35], 4);
 
 const streetLayer = L.tileLayer(
   "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   {
-    maxZoom: 19,
+    maxNativeZoom: 19,
+    maxZoom: 40,
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
@@ -12,7 +13,8 @@ const streetLayer = L.tileLayer(
 const satelliteLayer = L.tileLayer(
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   {
-    maxZoom: 19,
+    maxNativeZoom: 19,
+    maxZoom: 40,
     attribution:
       "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
   },
@@ -21,7 +23,8 @@ const satelliteLayer = L.tileLayer(
 const topographicLayer = L.tileLayer(
   "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
   {
-    maxZoom: 17,
+    maxNativeZoom: 17,
+    maxZoom: 40,
     attribution:
       'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
   },
