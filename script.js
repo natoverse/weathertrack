@@ -927,12 +927,7 @@ function closestPointOnTrack(point) {
 function renderWaypoint(location) {
   const stopNumber = state.waypoints.length + 1;
   const label = stopLabel(stopNumber - 1);
-  const marker = L.marker(location)
-    .bindTooltip(label, {
-      permanent: true,
-      direction: "top",
-    })
-    .addTo(map);
+  const marker = L.marker(location).addTo(map);
   const item = document.createElement("li");
   item.textContent = label;
   controls.waypointList.append(item);
@@ -1138,10 +1133,8 @@ function stopLabel(index) {
 }
 
 function updateWaypointLabels() {
-  state.waypoints.forEach(({ marker, item }, index) => {
-    const label = stopLabel(index);
-    marker.setTooltipContent(label);
-    item.textContent = label;
+  state.waypoints.forEach(({ item }, index) => {
+    item.textContent = stopLabel(index);
   });
 }
 
