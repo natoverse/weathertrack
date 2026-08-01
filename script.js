@@ -1546,7 +1546,18 @@ function forecastTargets() {
   const measurements = trackMeasurements();
   const locations = state.waypoints.map(({ marker }) => marker.getLatLng());
   const targets = [];
+  const startLocation = state.anchors[0];
   const firstLocation = locations[0];
+
+  if (startLocation) {
+    targets.push({
+      badgeLabel: `${stopDay(0)} start`,
+      date: stopDate(0),
+      daytimeOnly: true,
+      label: `Trip start - ${stopDay(0)}`,
+      location: startLocation,
+    });
+  }
 
   if (firstLocation) {
     targets.push({
