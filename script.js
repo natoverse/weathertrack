@@ -143,9 +143,10 @@ function selectTab(tab) {
 function setTripToolsExpanded(expanded) {
   controls.tripTools.classList.toggle("is-collapsed", !expanded);
   controls.tripToolsToggle.setAttribute("aria-expanded", expanded);
-  controls.tripToolsToggle.textContent = expanded
-    ? "Hide trip tools"
-    : "Show trip tools";
+  controls.tripToolsToggle.classList.toggle("is-expanded", expanded);
+  const label = expanded ? "Collapse trip tools" : "Expand trip tools";
+  controls.tripToolsToggle.setAttribute("aria-label", label);
+  controls.tripToolsToggle.title = label;
 }
 
 function updateControls() {
