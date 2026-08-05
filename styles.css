@@ -145,9 +145,33 @@ h1 {
   box-shadow: 0 0.125rem 0.75rem rgb(0 0 0 / 25%);
 }
 
-.trip-tools-toggle {
-  width: 100%;
+.trip-tools-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
   margin-bottom: 0.75rem;
+}
+
+.trip-tools-toggle {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.25rem;
+  padding: 0.5rem;
+}
+
+.trip-tools-toggle svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.trip-tools-toggle.is-expanded svg {
+  transform: rotate(180deg);
 }
 
 .trip-tools.is-collapsed {
@@ -157,12 +181,16 @@ h1 {
   overflow: visible;
 }
 
-.trip-tools.is-collapsed > :not(.trip-tools-toggle) {
+.trip-tools.is-collapsed > :not(.trip-tools-header) {
   display: none;
 }
 
-.trip-tools.is-collapsed .trip-tools-toggle {
+.trip-tools.is-collapsed .trip-tools-header {
   margin: 0;
+}
+
+.trip-tools.is-collapsed .tabs {
+  display: none;
 }
 
 .trip-tools h2,
@@ -172,9 +200,9 @@ h1 {
 
 .tabs {
   display: grid;
+  flex: 1;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
 }
 
 .tabs button[aria-selected="false"] {

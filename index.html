@@ -34,32 +34,38 @@
     <div class="app-shell">
       <main id="map" aria-label="Interactive trip planning map"></main>
       <section class="trip-tools" aria-label="Trip tools">
-        <button
-          id="trip-tools-toggle"
-          class="trip-tools-toggle"
-          type="button"
-          aria-expanded="true"
-        >
-          Hide trip tools
-        </button>
-        <div class="tabs" role="tablist" aria-label="Trip tools">
+        <div class="trip-tools-header">
+          <div class="tabs" role="tablist" aria-label="Trip tools">
+            <button
+              id="planner-tab"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="planner-panel"
+            >
+              Plan a trip
+            </button>
+            <button
+              id="trips-tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="trips-panel"
+            >
+              All trips
+            </button>
+          </div>
           <button
-            id="planner-tab"
+            id="trip-tools-toggle"
+            class="trip-tools-toggle is-expanded"
             type="button"
-            role="tab"
-            aria-selected="true"
-            aria-controls="planner-panel"
+            aria-expanded="true"
+            aria-label="Collapse trip tools"
+            title="Collapse trip tools"
           >
-            Plan a trip
-          </button>
-          <button
-            id="trips-tab"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            aria-controls="trips-panel"
-          >
-            All trips
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
           </button>
         </div>
         <section id="planner-panel" role="tabpanel" aria-labelledby="planner-tab">
