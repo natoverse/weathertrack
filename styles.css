@@ -170,7 +170,7 @@ h1 {
   stroke-width: 2;
 }
 
-.trip-tools-toggle.is-expanded svg {
+.trip-tools-toggle:not(.is-expanded) svg {
   transform: rotate(180deg);
 }
 
