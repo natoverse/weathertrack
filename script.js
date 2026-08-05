@@ -43,6 +43,8 @@ L.control
   .addTo(map);
 
 const controls = {
+  tripTools: document.querySelector(".trip-tools"),
+  tripToolsToggle: document.querySelector("#trip-tools-toggle"),
   plannerTab: document.querySelector("#planner-tab"),
   tripsTab: document.querySelector("#trips-tab"),
   plannerPanel: document.querySelector("#planner-panel"),
@@ -136,6 +138,14 @@ function selectTab(tab) {
   controls.tripsTab.setAttribute("aria-selected", !showingPlanner);
   controls.plannerPanel.hidden = !showingPlanner;
   controls.tripsPanel.hidden = showingPlanner;
+}
+
+function setTripToolsExpanded(expanded) {
+  controls.tripTools.classList.toggle("is-collapsed", !expanded);
+  controls.tripToolsToggle.setAttribute("aria-expanded", expanded);
+  controls.tripToolsToggle.textContent = expanded
+    ? "Hide trip tools"
+    : "Show trip tools";
 }
 
 function updateControls() {
@@ -1887,6 +1897,11 @@ controls.newTrip.addEventListener("click", () => {
   updateControls();
 });
 
+controls.tripToolsToggle.addEventListener("click", () => {
+  setTripToolsExpanded(
+    controls.tripToolsToggle.getAttribute("aria-expanded") !== "true",
+  );
+});
 controls.plannerTab.addEventListener("click", () => selectTab("planner"));
 controls.tripsTab.addEventListener("click", () => {
   selectTab("trips");

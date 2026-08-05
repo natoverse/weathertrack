@@ -145,6 +145,26 @@ h1 {
   box-shadow: 0 0.125rem 0.75rem rgb(0 0 0 / 25%);
 }
 
+.trip-tools-toggle {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.trip-tools.is-collapsed {
+  width: auto;
+  max-height: none;
+  padding: 0.5rem;
+  overflow: visible;
+}
+
+.trip-tools.is-collapsed > :not(.trip-tools-toggle) {
+  display: none;
+}
+
+.trip-tools.is-collapsed .trip-tools-toggle {
+  margin: 0;
+}
+
 .trip-tools h2,
 .trip-tools p {
   margin-top: 0;
