@@ -44,18 +44,20 @@ L.control
 
 const controls = {
   tripTools: document.querySelector(".trip-tools"),
-  tripToolsToggle: document.querySelector("#trip-tools-toggle"),
-  plannerTab: document.querySelector("#planner-tab"),
-  tripsTab: document.querySelector("#trips-tab"),
-  plannerPanel: document.querySelector("#planner-panel"),
+  tripsMenuToggle: document.querySelector("#trips-menu-toggle"),
   tripsPanel: document.querySelector("#trips-panel"),
-  tripDetails: document.querySelector("#trip-details"),
+  createTrip: document.querySelector("#create-trip"),
+  editTrip: document.querySelector("#edit-trip"),
+  closeTrip: document.querySelector("#close-trip"),
   name: document.querySelector("#trip-name"),
+  nameDisplay: document.querySelector("#trip-name-display"),
   date: document.querySelector("#trip-date"),
-  newTrip: document.querySelector("#new-trip"),
+  dateDisplay: document.querySelector("#trip-date-display"),
+  start: document.querySelector("#start-track"),
   undo: document.querySelector("#undo-point"),
   finish: document.querySelector("#finish-track"),
   addWaypoint: document.querySelector("#add-waypoint"),
+  removeWaypoint: document.querySelector("#remove-waypoint"),
   save: document.querySelector("#save-trip"),
   importGpx: document.querySelector("#import-gpx"),
   downloadGpx: document.querySelector("#download-gpx"),
@@ -92,7 +94,6 @@ const state = {
   anchors: [],
   segments: [],
   waypoints: [],
-  tripStarted: false,
   recording: false,
   placingWaypoint: false,
   routing: false,
@@ -109,6 +110,8 @@ const state = {
   profileController: null,
   elevationProfile: [],
   profileLoading: false,
+  mode: "closed",
+  selectedWaypoint: null,
 };
 
 const METERS_PER_MILE = 1609.344;
@@ -134,40 +137,72 @@ function setTripListStatus(message) {
   controls.tripListStatus.textContent = message;
 }
 
-function selectTab(tab) {
-  const showingPlanner = tab === "planner";
-  controls.plannerTab.setAttribute("aria-selected", showingPlanner);
-  controls.tripsTab.setAttribute("aria-selected", !showingPlanner);
-  controls.plannerPanel.hidden = !showingPlanner;
-  controls.tripsPanel.hidden = showingPlanner;
+function setTripsMenuExpanded(expanded) {
+  controls.tripsPanel.hidden = !expanded;
+  controls.tripsMenuToggle.setAttribute("aria-expanded", expanded);
+  if (expanded) {
+    loadTripList();
+  }
 }
 
-function setTripToolsExpanded(expanded) {
-  controls.tripTools.classList.toggle("is-collapsed", !expanded);
-  controls.tripToolsToggle.setAttribute("aria-expanded", expanded);
-  controls.tripToolsToggle.classList.toggle("is-expanded", expanded);
-  const label = expanded ? "Collapse trip tools" : "Expand trip tools";
-  controls.tripToolsToggle.setAttribute("aria-label", label);
-  controls.tripToolsToggle.title = label;
+function setMode(mode) {
+  state.mode = mode;
+  controls.tripTools.hidden = mode === "closed";
+  controls.tripTools.classList.toggle("is-planning", mode === "planner");
+  controls.tripTools.classList.toggle("is-viewing", mode === "viewer");
+  if (mode !== "planner") {
+    state.recording = false;
+    state.placingWaypoint = false;
+    state.selectedWaypoint = null;
+    state.waypoints.forEach(({ item }) =>
+      item.classList.remove("is-selected"),
+    );
+  }
+  updateControls();
 }
 
 function updateControls() {
   const hasTrack = state.anchors.length > 0;
-  controls.tripDetails.hidden = !state.tripStarted;
+  const planning = state.mode === "planner";
+  controls.nameDisplay.textContent =
+    controls.name.value.trim() || "Untitled trip";
+  controls.dateDisplay.textContent = validDate(controls.date.value)
+    ? new Date(`${controls.date.value}T00:00:00Z`).toLocaleDateString(
+        undefined,
+        { dateStyle: "long", timeZone: "UTC" },
+      )
+    : "No start date";
+  controls.dateDisplay.dateTime = validDate(controls.date.value)
+    ? controls.date.value
+    : "";
   map
     .getContainer()
     .classList.toggle(
       "map-editing",
-      !state.importing && (state.recording || state.placingWaypoint),
+      planning &&
+        !state.importing &&
+        (state.recording || state.placingWaypoint),
     );
+  controls.start.disabled =
+    !planning ||
+    state.recording ||
+    state.routing ||
+    state.importing ||
+    state.saving;
   controls.undo.disabled =
-    !state.recording || !hasTrack || state.routing || state.importing;
+    !planning ||
+    !state.recording ||
+    !hasTrack ||
+    state.routing ||
+    state.importing;
   controls.finish.disabled =
+    !planning ||
     !state.recording ||
     state.anchors.length < 2 ||
     state.routing ||
     state.importing;
   controls.addWaypoint.disabled =
+    !planning ||
     state.recording ||
     state.anchors.length < 2 ||
     state.routing ||
@@ -176,9 +211,16 @@ function updateControls() {
     ? "Cancel stop"
     : "Add stop";
   controls.clear.disabled =
+    !planning ||
     (!hasTrack && state.waypoints.length === 0 && !state.routing) ||
     state.importing;
+  controls.removeWaypoint.disabled =
+    !planning ||
+    state.selectedWaypoint === null ||
+    state.routing ||
+    state.importing;
   controls.save.disabled =
+    !planning ||
     state.anchors.length < 2 ||
     state.routing ||
     state.saving ||
@@ -187,7 +229,6 @@ function updateControls() {
     state.routing || state.saving || state.importing;
   controls.downloadGpx.disabled =
     state.anchors.length < 2 || state.routing || state.importing;
-  controls.newTrip.disabled = state.routing || state.importing;
   controls.snap.disabled = state.routing || state.importing;
   controls.updateForecast.disabled =
     state.waypoints.length === 0 ||
@@ -377,15 +418,19 @@ function renderElevationChart(measurements, stops) {
       "circle",
     );
     dot.setAttribute("r", "6");
-    dot.setAttribute("role", "slider");
-    dot.setAttribute("tabindex", "0");
-    dot.setAttribute("aria-orientation", "horizontal");
-    dot.setAttribute("aria-valuemin", "0");
-    dot.setAttribute(
-      "aria-valuemax",
-      (measurements.total / METERS_PER_MILE).toFixed(1),
-    );
     dot.dataset.stopNumber = stop.number;
+    if (state.mode === "planner") {
+      dot.setAttribute("role", "slider");
+      dot.setAttribute("tabindex", "0");
+      dot.setAttribute("aria-orientation", "horizontal");
+      dot.setAttribute("aria-valuemin", "0");
+      dot.setAttribute(
+        "aria-valuemax",
+        (measurements.total / METERS_PER_MILE).toFixed(1),
+      );
+    } else {
+      dot.setAttribute("role", "img");
+    }
     const title = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "title",
@@ -415,6 +460,11 @@ function renderElevationChart(measurements, stops) {
       );
     };
     updateStop(distance);
+
+    if (state.mode !== "planner") {
+      svg.append(dot);
+      return;
+    }
 
     let pointerId = null;
     let moved = false;
@@ -763,7 +813,7 @@ function clearTrip() {
   state.routing = false;
   state.waypoints.forEach(({ marker }) => marker.remove());
   state.waypoints = [];
-  state.tripStarted = false;
+  state.selectedWaypoint = null;
   state.savedTripToken = null;
   clearForecasts();
   controls.name.value = "";
@@ -947,11 +997,49 @@ function renderWaypoint(location) {
   const label = stopLabel(stopNumber - 1);
   const marker = L.marker(location).addTo(map);
   const item = document.createElement("li");
-  item.textContent = label;
+  const select = document.createElement("button");
+  select.type = "button";
+  select.className = "waypoint-select";
+  select.textContent = label;
+  const waypoint = { marker, item, select };
+  select.addEventListener("click", () => selectWaypoint(waypoint));
+  marker.on("click", () => {
+    if (state.mode === "planner") {
+      selectWaypoint(waypoint);
+    }
+  });
+  item.append(select);
   controls.waypointList.append(item);
-  state.waypoints.push({ marker, item });
+  state.waypoints.push(waypoint);
   clearForecasts();
   renderTripProfile();
+}
+
+function selectWaypoint(waypoint) {
+  const index = state.waypoints.indexOf(waypoint);
+  state.selectedWaypoint = state.selectedWaypoint === index ? null : index;
+  state.waypoints.forEach(({ item }, waypointIndex) => {
+    item.classList.toggle(
+      "is-selected",
+      waypointIndex === state.selectedWaypoint,
+    );
+  });
+  updateControls();
+}
+
+function removeSelectedWaypoint() {
+  if (state.selectedWaypoint === null) {
+    return;
+  }
+  const [waypoint] = state.waypoints.splice(state.selectedWaypoint, 1);
+  waypoint.marker.remove();
+  waypoint.item.remove();
+  state.selectedWaypoint = null;
+  updateWaypointLabels();
+  clearForecasts();
+  renderTripProfile();
+  setStatus("Stop removed.");
+  updateControls();
 }
 
 function addWaypoint(point) {
@@ -1151,8 +1239,8 @@ function stopLabel(index) {
 }
 
 function updateWaypointLabels() {
-  state.waypoints.forEach(({ item }, index) => {
-    item.textContent = stopLabel(index);
+  state.waypoints.forEach(({ select }, index) => {
+    select.textContent = stopLabel(index);
   });
 }
 
@@ -1243,6 +1331,8 @@ async function saveTrip() {
     url.searchParams.set("trip", token);
     window.history.replaceState(null, "", url);
     setStatus("Trip saved. Copy this page’s URL to share it.");
+    setMode("viewer");
+    renderTripProfile();
     loadTripList();
   } catch {
     setStatus("The trip could not be saved. Please try again.");
@@ -1262,6 +1352,8 @@ function validTripSummary(trip) {
 
 async function loadListedTrip(token, trip) {
   clearTrip();
+  setMode("viewer");
+  setTripsMenuExpanded(false);
   const request = state.tripLoadRequest;
   const loadingTrip = loadSavedTrip(trip);
   state.savedTripToken = token;
@@ -1274,12 +1366,12 @@ async function loadListedTrip(token, trip) {
     url.search = "";
     url.searchParams.set("trip", token);
     window.history.replaceState(null, "", url);
-    selectTab("planner");
   } catch {
     if (request !== state.tripLoadRequest) {
       return;
     }
     state.savedTripToken = null;
+    setMode("closed");
     setStatus("This trip could not be loaded.");
   }
 }
@@ -1411,7 +1503,6 @@ async function loadSavedTrip(trip) {
   }
 
   invalidateElevationProfile();
-  state.tripStarted = true;
   controls.name.value = trip.name;
   if (trip.start !== undefined) {
     controls.date.value = trip.start;
@@ -1451,6 +1542,7 @@ async function loadTrip() {
   }
 
   try {
+    setMode("viewer");
     if (!token) {
       await loadLegacyTrip(parameters);
       return;
@@ -1472,6 +1564,7 @@ async function loadTrip() {
     await loadingTrip;
   } catch {
     state.savedTripToken = null;
+    setMode("closed");
     setStatus("This shared trip URL could not be loaded.");
   }
 }
@@ -1914,24 +2007,31 @@ async function updateForecasts() {
   updateControls();
 }
 
-controls.newTrip.addEventListener("click", () => {
+controls.createTrip.addEventListener("click", () => {
   clearTrip();
-  state.tripStarted = true;
+  setTripsMenuExpanded(false);
+  setMode("planner");
+  controls.name.focus();
+  setStatus("Select “Start track” to begin.");
+});
+
+controls.start.addEventListener("click", () => {
   state.recording = true;
   setStatus("Click the map to set the start of the track.");
   updateControls();
 });
 
-controls.tripToolsToggle.addEventListener("click", () => {
-  setTripToolsExpanded(
-    controls.tripToolsToggle.getAttribute("aria-expanded") !== "true",
+controls.tripsMenuToggle.addEventListener("click", () => {
+  setTripsMenuExpanded(
+    controls.tripsMenuToggle.getAttribute("aria-expanded") !== "true",
   );
 });
-controls.plannerTab.addEventListener("click", () => selectTab("planner"));
-controls.tripsTab.addEventListener("click", () => {
-  selectTab("trips");
-  loadTripList();
+controls.editTrip.addEventListener("click", () => {
+  setMode("planner");
+  renderTripProfile();
+  controls.name.focus();
 });
+controls.closeTrip.addEventListener("click", () => setMode("closed"));
 controls.undo.addEventListener("click", () => {
   invalidateElevationProfile();
   state.anchors.pop();
@@ -1965,10 +2065,11 @@ controls.addWaypoint.addEventListener("click", () => {
   );
   updateControls();
 });
+controls.removeWaypoint.addEventListener("click", removeSelectedWaypoint);
 
 controls.clear.addEventListener("click", () => {
   clearTrip();
-  setStatus("Trip cleared. Select “New trip” to begin.");
+  setStatus("Trip cleared. Select “Start track” to begin.");
 });
 
 controls.save.addEventListener("click", saveTrip);
@@ -1981,6 +2082,25 @@ controls.date.addEventListener("change", () => {
   renderTripProfile();
   clearForecasts();
   updateControls();
+});
+controls.name.addEventListener("input", updateControls);
+
+document.addEventListener("click", (event) => {
+  if (
+    controls.tripsMenuToggle.getAttribute("aria-expanded") === "true" &&
+    !event.target.closest(".trips-menu")
+  ) {
+    setTripsMenuExpanded(false);
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (
+    event.key === "Escape" &&
+    controls.tripsMenuToggle.getAttribute("aria-expanded") === "true"
+  ) {
+    setTripsMenuExpanded(false);
+    controls.tripsMenuToggle.focus();
+  }
 });
 
 map.on("click", ({ latlng }) => {

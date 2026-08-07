@@ -16,85 +16,112 @@
   <body>
     <header>
       <h1>WeatherTrack</h1>
-      <a
-        class="github-link"
-        href="https://github.com/natoverse/weathertrack"
-        aria-label="View WeatherTrack on GitHub"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M12 .7a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.6.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.1 4.8 18.1 5 18.1 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.8 5.4-5.5 5.7.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 12 .7Z"
-          />
-        </svg>
-      </a>
-    </header>
-    <div class="app-shell">
-      <main id="map" aria-label="Interactive trip planning map"></main>
-      <section class="trip-tools" aria-label="Trip tools">
-        <div class="trip-tools-header">
-          <div class="tabs" role="tablist" aria-label="Trip tools">
-            <button
-              id="planner-tab"
-              type="button"
-              role="tab"
-              aria-selected="true"
-              aria-controls="planner-panel"
-            >
-              Plan a trip
-            </button>
-            <button
-              id="trips-tab"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              aria-controls="trips-panel"
-            >
-              All trips
-            </button>
-          </div>
+      <div class="header-actions">
+        <div class="trips-menu">
           <button
-            id="trip-tools-toggle"
-            class="trip-tools-toggle is-expanded"
+            id="trips-menu-toggle"
+            class="trips-menu-toggle"
             type="button"
-            aria-expanded="true"
-            aria-label="Collapse trip tools"
-            title="Collapse trip tools"
+            aria-expanded="false"
+            aria-controls="trips-panel"
           >
+            All trips
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
+          <section id="trips-panel" class="trips-panel" hidden>
+            <button id="create-trip" type="button">Create trip</button>
+            <p class="instructions">Load or delete a saved trip.</p>
+            <output id="trip-list-status" aria-live="polite">
+              Loading trips…
+            </output>
+            <ul id="trip-list" aria-label="Saved trips"></ul>
+            <details id="past-trips" class="past-trips" hidden>
+              <summary>Past trips</summary>
+              <ul id="past-trip-list" aria-label="Past trips"></ul>
+            </details>
+          </section>
         </div>
-        <section id="planner-panel" role="tabpanel" aria-labelledby="planner-tab">
-          <p class="instructions">
-            Start a trip, then click the map to plot its track.
-          </p>
-          <div id="trip-details" hidden>
-            <label class="trip-name">
-              Trip name
-              <input id="trip-name" type="text" maxlength="100" />
-            </label>
-            <label class="trip-date">
-              Trip start date
-              <input id="trip-date" type="date" />
-            </label>
-          </div>
-          <div class="tool-buttons">
-            <button id="new-trip" type="button">New trip</button>
+        <a
+          class="github-link"
+          href="https://github.com/natoverse/weathertrack"
+          aria-label="View WeatherTrack on GitHub"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 .7a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.6.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.1 4.8 18.1 5 18.1 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.8 5.4-5.5 5.7.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 12 .7Z"
+            />
+          </svg>
+        </a>
+      </div>
+    </header>
+    <div class="app-shell">
+      <main id="map" aria-label="Interactive trip planning map"></main>
+      <section class="trip-tools" aria-label="Trip details" hidden>
+        <div class="trip-tools-header">
+          <h2 id="trip-name-display">Untitled trip</h2>
+          <input
+            id="trip-name"
+            class="planner-only"
+            type="text"
+            maxlength="100"
+            aria-label="Trip name"
+          />
+          <button
+            id="edit-trip"
+            class="icon-button viewer-only"
+            type="button"
+            aria-label="Edit trip"
+            title="Edit trip"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z" />
+              <path d="m13.5 7 3.5 3.5" />
+            </svg>
+          </button>
+          <button
+            id="close-trip"
+            class="icon-button"
+            type="button"
+            aria-label="Close trip panel"
+            title="Close trip panel"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <div class="trip-date-row">
+          <span>Trip start date</span>
+          <time id="trip-date-display" class="viewer-only"></time>
+          <input
+            id="trip-date"
+            class="planner-only"
+            type="date"
+            aria-label="Trip start date"
+          />
+        </div>
+        <section class="planner-only" aria-label="Trip planner">
+          <p class="instructions">Start the track, then click the map to plot it.</p>
+          <div class="tool-buttons track-buttons">
+            <button id="start-track" type="button">Start track</button>
             <button id="undo-point" type="button" disabled>Undo</button>
-            <button id="finish-track" type="button" disabled>
-              Finish track
-            </button>
+            <button id="finish-track" type="button" disabled>Finish track</button>
+          </div>
+          <div class="tool-buttons stop-buttons">
             <button id="add-waypoint" type="button" disabled>Add stop</button>
-            <button id="save-trip" type="button" disabled>Save</button>
-            <button id="import-gpx" type="button">Import GPX</button>
-            <button id="download-gpx" type="button" disabled>
-              Download GPX
+            <button id="remove-waypoint" type="button" disabled>
+              Remove stop
             </button>
+          </div>
+          <ol id="waypoint-list" aria-label="Trip stops"></ol>
+          <div class="tool-buttons final-buttons">
             <button id="clear-trip" type="button" disabled>Clear</button>
+            <button id="save-trip" type="button" disabled>Save</button>
             <input
               id="gpx-file"
               type="file"
@@ -102,25 +129,31 @@
               hidden
             />
           </div>
+          <div class="tool-buttons file-buttons">
+            <button id="import-gpx" type="button">Import GPX</button>
+            <button id="download-gpx" type="button" disabled>
+              Download GPX
+            </button>
+          </div>
           <label class="snap-option">
             <input id="snap-to-routes" type="checkbox" checked />
             Snap to trails and roads when available
           </label>
           <output id="trip-status" aria-live="polite">
-            Select “New trip” to begin.
+            Select “Start track” to begin.
           </output>
-          <ol id="waypoint-list" aria-label="Trip stops"></ol>
-          <section
-            id="trip-profile"
-            class="trip-profile"
-            aria-labelledby="trip-profile-title"
-            hidden
-          >
+        </section>
+        <section
+          id="trip-profile"
+          class="trip-profile"
+          aria-labelledby="trip-profile-title"
+          hidden
+        >
             <h2 id="trip-profile-title">Trip profile</h2>
             <p id="trip-mileage" class="trip-mileage"></p>
             <p id="profile-totals" class="profile-totals"></p>
             <div id="elevation-chart" class="elevation-chart"></div>
-            <p class="profile-help">
+            <p class="profile-help planner-only">
               Drag a stop dot to adjust that day’s mileage.
             </p>
             <p
@@ -144,11 +177,18 @@
                 <tbody id="day-summary-body"></tbody>
               </table>
             </div>
-          </section>
-          <section class="forecast-panel" aria-labelledby="forecast-title">
+        </section>
+        <section class="forecast-panel" aria-labelledby="forecast-title">
             <div class="forecast-heading">
               <h2 id="forecast-title">NWS forecast</h2>
-              <button id="update-forecast" type="button" disabled>Update</button>
+              <button
+                id="update-forecast"
+                class="planner-only"
+                type="button"
+                disabled
+              >
+                Update
+              </button>
             </div>
             <p class="forecast-help">
               The daytime forecast at the trip start uses the first day. Stop 1
@@ -160,23 +200,10 @@
               Add a stop to load its NWS forecast.
             </output>
             <div id="forecast-results"></div>
-          </section>
-          <small>Routing data © OpenStreetMap contributors</small>
         </section>
-        <section
-          id="trips-panel"
-          role="tabpanel"
-          aria-labelledby="trips-tab"
-          hidden
-        >
-          <p class="instructions">Load or delete a saved trip.</p>
-          <output id="trip-list-status" aria-live="polite">Loading trips…</output>
-          <ul id="trip-list" aria-label="Saved trips"></ul>
-          <details id="past-trips" class="past-trips" hidden>
-            <summary>Past trips</summary>
-            <ul id="past-trip-list" aria-label="Past trips"></ul>
-          </details>
-        </section>
+        <small class="planner-only">
+          Routing data © OpenStreetMap contributors
+        </small>
       </section>
     </div>
     <script
