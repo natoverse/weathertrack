@@ -455,10 +455,21 @@ button:disabled {
   color: #5d6762;
 }
 
-#trip-list {
+#trip-list,
+#past-trip-list {
   padding: 0;
   margin: 0.75rem 0 0;
   list-style: none;
+}
+
+.past-trips {
+  margin-top: 0.75rem;
+}
+
+.past-trips summary {
+  color: #183d2d;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .saved-trip {
