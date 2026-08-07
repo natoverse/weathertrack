@@ -69,6 +69,8 @@ const controls = {
   forecastResults: document.querySelector("#forecast-results"),
   tripListStatus: document.querySelector("#trip-list-status"),
   tripList: document.querySelector("#trip-list"),
+  pastTrips: document.querySelector("#past-trips"),
+  pastTripList: document.querySelector("#past-trip-list"),
   tripProfile: document.querySelector("#trip-profile"),
   tripMileage: document.querySelector("#trip-mileage"),
   profileTotals: document.querySelector("#profile-totals"),
@@ -1302,8 +1304,18 @@ async function deleteListedTrip(token, name) {
   }
 }
 
-function renderTripList(trips) {
-  controls.tripList.replaceChildren();
+function tripHasElapsed(trip) {
+  if (!trip.start) {
+    return false;
+  }
+
+  const end = new Date(`${trip.start}T00:00:00Z`);
+  const nights = Array.isArray(trip.stops) ? trip.stops.length : 0;
+  end.setUTCDate(end.getUTCDate() + nights);
+  return end.toISOString().slice(0, 10) < localDate();
+}
+
+function renderTrips(list, trips) {
   trips.forEach(([token, trip]) => {
     const item = document.createElement("li");
     item.className = "saved-trip";
@@ -1328,8 +1340,18 @@ function renderTripList(trips) {
     remove.textContent = "Delete";
     remove.addEventListener("click", () => deleteListedTrip(token, trip.name));
     item.append(details, load, remove);
-    controls.tripList.append(item);
+    list.append(item);
   });
+}
+
+function renderTripList(trips) {
+  const currentTrips = trips.filter(([, trip]) => !tripHasElapsed(trip));
+  const pastTrips = trips.filter(([, trip]) => tripHasElapsed(trip));
+  controls.tripList.replaceChildren();
+  controls.pastTripList.replaceChildren();
+  renderTrips(controls.tripList, currentTrips);
+  renderTrips(controls.pastTripList, pastTrips);
+  controls.pastTrips.hidden = pastTrips.length === 0;
 }
 
 async function loadTripList() {
@@ -1363,6 +1385,8 @@ async function loadTripList() {
     );
   } catch {
     controls.tripList.replaceChildren();
+    controls.pastTripList.replaceChildren();
+    controls.pastTrips.hidden = true;
     setTripListStatus("Trips could not be loaded. Please try again.");
   } finally {
     state.listingTrips = false;
