@@ -15,6 +15,8 @@ body {
 }
 
 header {
+  position: relative;
+  z-index: 1100;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -36,6 +38,56 @@ h1 {
 .github-link svg {
   width: 1.75rem;
   height: 1.75rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.trips-menu {
+  position: relative;
+}
+
+.trips-menu-toggle {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.4rem 0.65rem;
+  background: transparent;
+}
+
+.trips-menu-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.trips-menu-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.trips-panel {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  width: min(24rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 5rem);
+  padding: 1rem;
+  overflow-y: auto;
+  color: #17221d;
+  background: rgb(255 255 255 / 98%);
+  border-radius: 0 0 0.5rem 0.5rem;
+  box-shadow: 0 0.125rem 0.75rem rgb(0 0 0 / 25%);
+}
+
+#create-trip {
+  width: 100%;
 }
 
 .app-shell {
@@ -148,19 +200,38 @@ h1 {
 .trip-tools-header {
   display: flex;
   gap: 0.5rem;
-  align-items: stretch;
+  align-items: center;
   margin-bottom: 0.75rem;
 }
 
-.trip-tools-toggle {
+.trip-tools-header h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.trip-tools-header input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem;
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.icon-button {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
   width: 2.25rem;
+  height: 2.25rem;
   padding: 0.5rem;
+  color: #183d2d;
+  background: #e8f2ed;
 }
 
-.trip-tools-toggle svg {
+.icon-button svg {
   width: 1.25rem;
   height: 1.25rem;
   fill: none;
@@ -170,44 +241,14 @@ h1 {
   stroke-width: 2;
 }
 
-.trip-tools-toggle:not(.is-expanded) svg {
-  transform: rotate(180deg);
-}
-
-.trip-tools.is-collapsed {
-  width: auto;
-  max-height: none;
-  padding: 0.5rem;
-  overflow: visible;
-}
-
-.trip-tools.is-collapsed > :not(.trip-tools-header) {
-  display: none;
-}
-
-.trip-tools.is-collapsed .trip-tools-header {
-  margin: 0;
-}
-
-.trip-tools.is-collapsed .tabs {
-  display: none;
-}
-
 .trip-tools h2,
 .trip-tools p {
   margin-top: 0;
 }
 
-.tabs {
-  display: grid;
-  flex: 1;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-}
-
-.tabs button[aria-selected="false"] {
-  color: #183d2d;
-  background: #e8f2ed;
+.trip-tools.is-viewing .planner-only,
+.trip-tools.is-planning .viewer-only {
+  display: none !important;
 }
 
 .trip-tools h2 {
@@ -221,26 +262,38 @@ h1 {
   font-size: 0.9rem;
 }
 
-.trip-name,
-.trip-date {
-  display: block;
+.trip-date-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
 }
 
-.trip-name input,
-.trip-date input {
-  display: block;
-  width: 100%;
-  margin-top: 0.25rem;
+.trip-date-row input {
   padding: 0.4rem;
   font: inherit;
+}
+
+.trip-date-row time {
+  color: #3f4a45;
 }
 
 .tool-buttons {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.5rem;
+}
+
+.track-buttons {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.stop-buttons,
+.file-buttons,
+.final-buttons {
+  margin-top: 0.5rem;
 }
 
 button {
@@ -269,11 +322,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-#new-trip,
-#clear-trip {
-  grid-column: span 2;
-}
-
 .snap-option {
   display: flex;
   gap: 0.5rem;
@@ -297,6 +345,19 @@ button:disabled {
   padding-left: 1.5rem;
   overflow-y: auto;
   font-size: 0.875rem;
+}
+
+#waypoint-list .waypoint-select {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  color: #183d2d;
+  text-align: left;
+  background: transparent;
+}
+
+#waypoint-list .is-selected .waypoint-select {
+  background: #d5eadf;
+  outline: 2px solid #1f6549;
 }
 
 #waypoint-list:empty {
@@ -346,7 +407,7 @@ button:disabled {
   stroke-width: 3;
 }
 
-.elevation-chart circle {
+.trip-tools.is-planning .elevation-chart circle {
   fill: #e8962e;
   stroke: #783f00;
   stroke-width: 2;
@@ -354,11 +415,11 @@ button:disabled {
   touch-action: none;
 }
 
-.elevation-chart circle.dragging {
+.trip-tools.is-planning .elevation-chart circle.dragging {
   cursor: grabbing;
 }
 
-.elevation-chart circle:focus-visible {
+.trip-tools.is-planning .elevation-chart circle:focus-visible {
   stroke-width: 4;
 }
 
