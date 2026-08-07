@@ -1371,6 +1371,7 @@ async function loadListedTrip(token, trip) {
       return;
     }
     state.savedTripToken = null;
+    setMode("closed");
     setStatus("This trip could not be loaded.");
   }
 }
