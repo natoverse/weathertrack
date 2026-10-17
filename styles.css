@@ -498,6 +498,16 @@ button:disabled {
   font-size: 1rem;
 }
 
+.forecast-card.is-fallback h3 {
+  color: #a34700;
+}
+
+.forecast-warning {
+  color: #a34700;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
 .forecast-card ul {
   padding-left: 1.25rem;
   margin: 0.5rem 0 0;
