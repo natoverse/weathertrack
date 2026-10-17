@@ -231,7 +231,8 @@ function updateControls() {
     state.anchors.length < 2 || state.routing || state.importing;
   controls.snap.disabled = state.routing || state.importing;
   controls.updateForecast.disabled =
-    state.waypoints.length === 0 ||
+    state.anchors.length < 2 ||
+    state.recording ||
     !validDate(controls.date.value) ||
     state.routing ||
     state.importing ||
@@ -1252,8 +1253,8 @@ function clearForecasts() {
   forecastMarkers.clearLayers();
   controls.forecastResults.replaceChildren();
   const message =
-    state.waypoints.length === 0
-      ? "Add a stop to load its NWS forecast."
+    state.anchors.length < 2
+      ? "Draw or import a track to load its NWS forecast."
       : "Select Update to load the NWS forecast.";
   controls.forecastStatus.value = message;
   controls.forecastStatus.textContent = message;
@@ -1517,7 +1518,7 @@ async function loadSavedTrip(trip) {
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
   updateControls();
   await loadElevationProfile();
-  if (stops.length > 0 && validDate(controls.date.value)) {
+  if (validDate(controls.date.value)) {
     updateForecasts();
   }
 }
@@ -1677,6 +1678,24 @@ function forecastTargets() {
   const startLocation = state.anchors[0];
   const firstLocation = locations[0];
 
+  if (locations.length === 0 && state.anchors.length >= 2) {
+    return [
+      { name: "start", hour: 8, location: startLocation },
+      {
+        name: "midpoint",
+        hour: 12,
+        location: locationAlongTrack(measurements.total / 2, measurements),
+      },
+      { name: "end", hour: 20, location: state.anchors.at(-1) },
+    ].map(({ name, hour, location }) => ({
+      badgeLabel: `${stopDay(0)} ${name}`,
+      date: stopDate(0),
+      preferredHour: hour,
+      label: `Trip ${name} - ${stopDay(0)}`,
+      location,
+    }));
+  }
+
   if (startLocation) {
     targets.push({
       badgeLabel: `${stopDay(0)} start`,
@@ -1745,19 +1764,84 @@ function forecastTargets() {
   return targets;
 }
 
+function nearestForecastPeriod(periods, date, hour) {
+  const desiredTime = Date.parse(
+    `${date}T${String(hour).padStart(2, "0")}:00:00Z`,
+  );
+  let nearest = null;
+  let nearestDistance = Infinity;
+  periods.forEach((period) => {
+    if (
+      typeof period?.startTime !== "string" ||
+      period.startTime.slice(0, 10) !== date
+    ) {
+      return;
+    }
+    // Compare NWS local clock times, not the browser's time zone.
+    const start = Date.parse(`${period.startTime.slice(0, 19)}Z`);
+    const end =
+      typeof period.endTime === "string"
+        ? Date.parse(`${period.endTime.slice(0, 19)}Z`)
+        : start;
+    const distance = Math.max(start - desiredTime, desiredTime - end, 0);
+    if (distance < nearestDistance || (distance === 0 && start === desiredTime)) {
+      nearest = period;
+      nearestDistance = distance;
+    }
+  });
+  return nearest ? [nearest] : [];
+}
+
 async function loadForecast(target, signal) {
-  const { badgeLabel, date, daytimeOnly, iconAnchor, label, location } = target;
+  const {
+    badgeLabel,
+    date,
+    daytimeOnly,
+    iconAnchor,
+    label,
+    location,
+    preferredHour,
+  } = target;
   const pointUrl = new URL(
     `https://api.weather.gov/points/${location.lat.toFixed(4)},${location.lng.toFixed(4)}`,
   );
   const pointData = await fetchNws(pointUrl, signal);
-  const forecastUrl = nwsUrl(pointData?.properties?.forecast);
-  forecastUrl.searchParams.set("units", "us");
-  const forecast = await fetchNws(forecastUrl, signal);
-  const periods = forecast?.properties?.periods;
+  let selectedPeriods;
+  if (preferredHour !== undefined && pointData?.properties?.forecastHourly) {
+    try {
+      const hourlyUrl = nwsUrl(pointData.properties.forecastHourly);
+      hourlyUrl.searchParams.set("units", "us");
+      const hourly = await fetchNws(hourlyUrl, signal);
+      selectedPeriods = nearestForecastPeriod(
+        hourly?.properties?.periods || [],
+        date,
+        preferredHour,
+      );
+    } catch (error) {
+      if (signal?.aborted) {
+        throw error;
+      }
+      // Use the longer-range forecast when hourly data is unavailable.
+    }
+  }
+  if (!selectedPeriods?.length) {
+    const forecastUrl = nwsUrl(pointData?.properties?.forecast);
+    forecastUrl.searchParams.set("units", "us");
+    const forecast = await fetchNws(forecastUrl, signal);
+    const periods = forecast?.properties?.periods;
 
-  if (!Array.isArray(periods)) {
-    throw new Error("NWS returned an invalid forecast");
+    if (!Array.isArray(periods)) {
+      throw new Error("NWS returned an invalid forecast");
+    }
+    selectedPeriods =
+      preferredHour !== undefined
+        ? nearestForecastPeriod(periods, date, preferredHour)
+        : periods.filter(
+            (period) =>
+              typeof period?.startTime === "string" &&
+              period.startTime.slice(0, 10) === date &&
+              (!daytimeOnly || period.isDaytime === true),
+          );
   }
 
   return {
@@ -1766,6 +1850,7 @@ async function loadForecast(target, signal) {
     iconAnchor,
     label,
     location,
+    preferredHour,
     pageUrl: nwsPageUrl(location),
     place: [
       pointData?.properties?.relativeLocation?.properties?.city,
@@ -1773,12 +1858,7 @@ async function loadForecast(target, signal) {
     ]
       .filter((part) => typeof part === "string" && part)
       .join(", "),
-    periods: periods.filter(
-      (period) =>
-        typeof period?.startTime === "string" &&
-        period.startTime.slice(0, 10) === date &&
-        (!daytimeOnly || period.isDaytime === true),
-    ),
+    periods: selectedPeriods,
   };
 }
 
@@ -1868,7 +1948,9 @@ function renderForecastMarker(result) {
   const values = document.createElement("div");
   const temperature = document.createElement("strong");
   const unit = summary.temperatureUnit ? `°${summary.temperatureUnit}` : "°";
-  if (summary.high !== null && summary.low !== null) {
+  if (result.preferredHour !== undefined && (summary.high ?? summary.low) !== null) {
+    temperature.textContent = `${summary.high ?? summary.low}${unit}`;
+  } else if (summary.high !== null && summary.low !== null) {
     temperature.textContent = `H ${summary.high}${unit} / L ${summary.low}${unit}`;
   } else if (summary.high !== null) {
     temperature.textContent = `H ${summary.high}${unit}`;
@@ -1902,12 +1984,48 @@ function renderForecastMarker(result) {
       iconAnchor: result.iconAnchor || [-10, 36],
       iconSize: FORECAST_MARKER_SIZE,
     }),
+    forecastIconAnchor: result.iconAnchor || [-10, 36],
     interactive: true,
     zIndexOffset: 500,
   });
   marker.bindTooltip(`${result.label}: ${summary.description}`);
   forecastMarkers.addLayer(marker);
 }
+
+function layoutForecastMarkers() {
+  const placed = [];
+  const [width, height] = FORECAST_MARKER_SIZE;
+  forecastMarkers.eachLayer((marker) => {
+    const point = map.latLngToLayerPoint(marker.getLatLng());
+    const preferred = marker.options.forecastIconAnchor;
+    let anchor = preferred;
+    let level = 0;
+    while (true) {
+      const bounds = {
+        left: point.x - anchor[0],
+        top: point.y - anchor[1],
+      };
+      if (!placed.some((other) =>
+        Math.abs(bounds.left - other.left) < width + FORECAST_MARKER_PADDING &&
+        Math.abs(bounds.top - other.top) < height + FORECAST_MARKER_PADDING
+      )) {
+        placed.push(bounds);
+        break;
+      }
+      level += 1;
+      anchor = [
+        level % 2 ? width + 10 : -10,
+        height / 2 + Math.floor(level / 2) * (height + FORECAST_MARKER_PADDING),
+      ];
+    }
+    marker.setIcon(L.divIcon({
+      ...marker.options.icon.options,
+      iconAnchor: anchor,
+    }));
+  });
+}
+
+map.on("zoomend", layoutForecastMarkers);
 
 function renderForecast(result) {
   const card = document.createElement("article");
@@ -1969,6 +2087,7 @@ async function updateForecasts() {
   state.forecastController?.abort();
   const controller = new AbortController();
   state.forecastController = controller;
+  forecastMarkers.clearLayers();
   controls.forecastResults.replaceChildren();
   controls.forecastStatus.value = "Loading NWS forecasts…";
   controls.forecastStatus.textContent = "Loading NWS forecasts…";
@@ -2001,6 +2120,7 @@ async function updateForecasts() {
   state.forecastController = null;
   results.forEach(renderForecast);
   results.forEach(renderForecastMarker);
+  layoutForecastMarkers();
   const updated = new Date();
   controls.forecastStatus.value = `Updated ${updated.toLocaleString()}.`;
   controls.forecastStatus.textContent = `Updated ${updated.toLocaleString()}.`;
@@ -2017,6 +2137,7 @@ controls.createTrip.addEventListener("click", () => {
 
 controls.start.addEventListener("click", () => {
   state.recording = true;
+  clearForecasts();
   setStatus("Click the map to set the start of the track.");
   updateControls();
 });
@@ -2050,7 +2171,8 @@ controls.undo.addEventListener("click", () => {
 controls.finish.addEventListener("click", () => {
   state.recording = false;
   state.placingWaypoint = false;
-  setStatus("Track finished. Select “Add stop,” then click along the track.");
+  clearForecasts();
+  setStatus("Track finished. Update the day-trip forecast, or add stops for a multi-day trip.");
   updateControls();
   map.fitBounds(track.getBounds(), { padding: [30, 30] });
   loadElevationProfile();

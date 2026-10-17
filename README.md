@@ -17,6 +17,10 @@ every day of a trip before you head out.
   the day after the final stop.
 - **Trip-wide weather overview.** See the forecast across the full duration of
   the trip so you can understand weather expectations from start to finish.
+- **Day trips without stops.** Get forecasts at the route start, distance
+  midpoint, and end on the trip date, using available NWS periods nearest to
+  morning, midday, and evening. Hourly forecasts are preferred, with the
+  longer-range day/night forecast used when hourly data is unavailable.
 
 ## Weather data sources
 

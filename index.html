@@ -191,13 +191,16 @@
               </button>
             </div>
             <p class="forecast-help">
+              Without stops, forecasts cover the start, distance midpoint, and
+              end on the trip date, using available NWS times nearest to morning,
+              midday, and evening. Add stops for a multi-day trip.
               The daytime forecast at the trip start uses the first day. Stop 1
               uses the trip start date; each following stop is one day later.
               Forecasts also cover the day before Stop 1, daytime halfway between
               stops, and the day after the final stop.
             </p>
             <output id="forecast-status" aria-live="polite">
-              Add a stop to load its NWS forecast.
+              Draw or import a track to load its NWS forecast.
             </output>
             <div id="forecast-results"></div>
         </section>
