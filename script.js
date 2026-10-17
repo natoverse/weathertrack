@@ -1792,6 +1792,24 @@ function nearestForecastPeriod(periods, date, hour) {
   return nearest ? [nearest] : [];
 }
 
+function latestEarlierForecastDate(periods, date, daytimeOnly) {
+  return periods.reduce((latest, period) => {
+    const periodDate =
+      typeof period?.startTime === "string"
+        ? period.startTime.slice(0, 10)
+        : null;
+    if (
+      typeof periodDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(periodDate) ||
+      periodDate >= date ||
+      (daytimeOnly && period.isDaytime !== true)
+    ) {
+      return latest;
+    }
+    return latest === null || periodDate > latest ? periodDate : latest;
+  }, null);
+}
+
 async function loadForecast(target, signal) {
   const {
     badgeLabel,
@@ -1807,6 +1825,7 @@ async function loadForecast(target, signal) {
   );
   const pointData = await fetchNws(pointUrl, signal);
   let selectedPeriods;
+  let forecastDate = date;
   if (preferredHour !== undefined && pointData?.properties?.forecastHourly) {
     try {
       const hourlyUrl = nwsUrl(pointData.properties.forecastHourly);
@@ -1842,11 +1861,37 @@ async function loadForecast(target, signal) {
               period.startTime.slice(0, 10) === date &&
               (!daytimeOnly || period.isDaytime === true),
           );
+    if (!selectedPeriods.length && date === controls.date.value) {
+      const latestDate = latestEarlierForecastDate(periods, date, daytimeOnly);
+      if (latestDate) {
+        selectedPeriods =
+          preferredHour !== undefined
+            ? nearestForecastPeriod(periods, latestDate, preferredHour)
+            : periods.filter(
+                (period) =>
+                  typeof period?.startTime === "string" &&
+                  period.startTime.slice(0, 10) === latestDate &&
+                  (!daytimeOnly || period.isDaytime === true),
+              );
+        if (selectedPeriods.length) {
+          forecastDate = latestDate;
+        }
+      }
+    }
   }
 
   return {
     badgeLabel,
     date,
+    forecastDate,
+    daysBeforeTripStart:
+      forecastDate === date
+        ? null
+        : Math.round(
+            (Date.parse(`${date}T00:00:00Z`) -
+              Date.parse(`${forecastDate}T00:00:00Z`)) /
+              86400000,
+          ),
     iconAnchor,
     label,
     location,
@@ -2029,8 +2074,23 @@ map.on("zoomend", layoutForecastMarkers);
 
 function renderForecast(result) {
   const card = document.createElement("article");
-  card.className = "forecast-card";
+  card.className = `forecast-card${
+    result.daysBeforeTripStart ? " is-fallback" : ""
+  }`;
   addText(card, "h3", `${result.label} — ${result.date}`);
+
+  if (result.daysBeforeTripStart) {
+    addText(
+      card,
+      "p",
+      `Warning: The latest available forecast is for ${
+        result.forecastDate
+      }, ${result.daysBeforeTripStart} day${
+        result.daysBeforeTripStart === 1 ? "" : "s"
+      } before your trip start.`,
+      "forecast-warning",
+    );
+  }
 
   if (result.place) {
     addText(card, "p", result.place);
