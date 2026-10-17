@@ -69,6 +69,7 @@ const controls = {
   updateForecast: document.querySelector("#update-forecast"),
   forecastStatus: document.querySelector("#forecast-status"),
   forecastResults: document.querySelector("#forecast-results"),
+  forecastWarningBanner: document.querySelector("#forecast-warning-banner"),
   tripListStatus: document.querySelector("#trip-list-status"),
   tripList: document.querySelector("#trip-list"),
   pastTrips: document.querySelector("#past-trips"),
@@ -1245,6 +1246,14 @@ function updateWaypointLabels() {
   });
 }
 
+function setForecastWarning(visible) {
+  if (controls.forecastWarningBanner.hidden === !visible) {
+    return;
+  }
+  controls.forecastWarningBanner.hidden = !visible;
+  map.invalidateSize({ pan: false });
+}
+
 function clearForecasts() {
   state.forecastRequest += 1;
   state.forecasting = false;
@@ -1252,6 +1261,7 @@ function clearForecasts() {
   state.forecastController = null;
   forecastMarkers.clearLayers();
   controls.forecastResults.replaceChildren();
+  setForecastWarning(false);
   const message =
     state.anchors.length < 2
       ? "Draw or import a track to load its NWS forecast."
@@ -2151,6 +2161,7 @@ async function updateForecasts() {
   controls.forecastResults.replaceChildren();
   controls.forecastStatus.value = "Loading NWS forecasts…";
   controls.forecastStatus.textContent = "Loading NWS forecasts…";
+  setForecastWarning(false);
   updateControls();
 
   const timeout = window.setTimeout(() => controller.abort(), 15000);
@@ -2178,6 +2189,7 @@ async function updateForecasts() {
 
   state.forecasting = false;
   state.forecastController = null;
+  setForecastWarning(results.some((result) => result.daysBeforeTripStart > 0));
   results.forEach(renderForecast);
   results.forEach(renderForecastMarker);
   layoutForecastMarkers();

@@ -90,6 +90,17 @@ h1 {
   width: 100%;
 }
 
+.forecast-warning-banner {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.5rem 1.25rem;
+  color: #a34700;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: #fff4e5;
+  border-bottom: 1px solid #a34700;
+}
+
 .app-shell {
   position: relative;
   display: flex;
