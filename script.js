@@ -1973,7 +1973,7 @@ function renderForecastMarker(result) {
     badge,
     "div",
     result.badgeLabel || result.label,
-    "forecast-map-badge-label",
+    `forecast-map-badge-label${result.daysBeforeTripStart ? " is-fallback" : ""}`,
   );
   const content = document.createElement("div");
   content.className = "forecast-map-badge-content";

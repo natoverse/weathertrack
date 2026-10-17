@@ -155,6 +155,10 @@ h1 {
   background: #1f4f3b;
 }
 
+.forecast-map-badge-label.is-fallback {
+  background: #a34700;
+}
+
 .forecast-map-badge-content {
   display: flex;
   flex: 1;
