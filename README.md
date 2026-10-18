@@ -18,8 +18,11 @@ every day of a trip before you head out.
 - **Trip-wide weather overview.** See the forecast across the full duration of
   the trip so you can understand weather expectations from start to finish.
 - **Day trips without stops.** Get forecasts at the route start, distance
-  midpoint, and end on the trip date, using available NWS periods nearest to
-  morning, midday, and evening. Hourly forecasts are preferred, with the
+  midpoint, end, and elevation high point on the trip date. High-point arrival
+  time is estimated from distance along the route, interpolating between an
+  8 a.m. start, noon midpoint, and 8 p.m. finish, rounded to the nearest hour.
+  The high-point forecast is omitted when elevation data is unavailable.
+  Hourly forecasts are preferred, with the
   longer-range day/night forecast used when hourly data is unavailable.
 
 ## Weather data sources
