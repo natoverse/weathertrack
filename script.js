@@ -1671,7 +1671,7 @@ function highPointForecastTarget(measurements, locations) {
   const dayIndex =
     nextStopIndex === -1 ? stopDistances.length : nextStopIndex;
 
-  return {
+  const target = {
     badgeLabel: `${stopDay(dayIndex)} high point`,
     date: stopDate(dayIndex),
     daytimeOnly: true,
@@ -1679,6 +1679,18 @@ function highPointForecastTarget(measurements, locations) {
     label: `High point - ${stopDay(dayIndex)}`,
     location: locationAlongTrack(highPoint.distance, measurements),
   };
+  if (locations.length === 0) {
+    const progress =
+      measurements.total > 0
+        ? Math.max(0, Math.min(1, highPoint.distance / measurements.total))
+        : 0;
+    // Match the day-trip start (08:00), midpoint (12:00), and end (20:00).
+    target.preferredHour = Math.round(
+      progress <= 0.5 ? 8 + progress * 8 : 12 + (progress - 0.5) * 16,
+    );
+    target.daytimeOnly = false;
+  }
+  return target;
 }
 
 function forecastTargets() {
@@ -1689,7 +1701,7 @@ function forecastTargets() {
   const firstLocation = locations[0];
 
   if (locations.length === 0 && state.anchors.length >= 2) {
-    return [
+    const dayTripTargets = [
       { name: "start", hour: 8, location: startLocation },
       {
         name: "midpoint",
@@ -1704,6 +1716,11 @@ function forecastTargets() {
       label: `Trip ${name} - ${stopDay(0)}`,
       location,
     }));
+    const highPointTarget = highPointForecastTarget(measurements, locations);
+    if (highPointTarget) {
+      dayTripTargets.push(highPointTarget);
+    }
+    return dayTripTargets;
   }
 
   if (startLocation) {
